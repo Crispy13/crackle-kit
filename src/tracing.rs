@@ -1,6 +1,6 @@
 use std::{
     env,
-    fs::File,
+    fs::{self, File},
     io,
     path::{Path, PathBuf},
 };
@@ -21,9 +21,11 @@ pub fn setup_logging_to_stderr_and_file(
         .pretty()
         .with_writer(io::stderr);
 
-    let file_layer = tracing_subscriber::fmt::layer()
-        .pretty()
-        .with_writer(File::create(file_path.as_ref())?);
+    let file_layer = tracing_subscriber::fmt::layer().pretty().with_writer(
+        fs::OpenOptions::new()
+            .append(true)
+            .open(file_path.as_ref())?,
+    );
 
     tracing_subscriber::registry()
         .with(
@@ -99,9 +101,20 @@ mod test {
     use super::*;
 
     #[test]
-    fn test_init() {
+    fn test_rolling() {
         // setup_logging_to_stderr_and_file("test.log").unwrap();
         setup_logging_to_stderr_and_rolling_file("crackle-kit").unwrap();
+
+        event!(Level::DEBUG, "debug!");
+        event!(Level::INFO, "info!");
+        event!(Level::TRACE, "trace!");
+        event!(Level::ERROR, "error!");
+    }
+
+    #[test]
+    fn test_append() {
+        setup_logging_to_stderr_and_file("test.log").unwrap();
+        // setup_logging_to_stderr_and_rolling_file("crackle-kit").unwrap();
 
         event!(Level::DEBUG, "debug!");
         event!(Level::INFO, "info!");
