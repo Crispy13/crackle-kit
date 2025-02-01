@@ -1,4 +1,9 @@
-use std::{env, fs::File, io, path::Path};
+use std::{
+    env,
+    fs::File,
+    io,
+    path::{Path, PathBuf},
+};
 
 use anyhow::Error;
 use tracing::{event, Level};
@@ -77,7 +82,12 @@ pub fn setup_logging_to_stderr_and_rolling_file(
         )
         .try_init()?;
 
-    event!(Level::DEBUG, "log dir = {}", tmp_dir);
+    let log_dir_abs_path = match Path::new(&tmp_dir).canonicalize() {
+        Ok(v) => v,
+        Err(_) => PathBuf::from(tmp_dir),
+    };
+
+    event!(Level::INFO, "log dir = {}", log_dir_abs_path.display());
 
     Ok(())
 }
