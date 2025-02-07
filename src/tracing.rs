@@ -31,7 +31,11 @@ pub fn setup_logging_to_stderr_and_file(
         .with(
             stderr_layer
                 .with_timer(ChronoLocal::rfc_3339())
-                .with_filter(stderr_log_level),
+                .with_file(false)
+                .with_line_number(false)
+                .with_target(false)
+                .with_filter(stderr_log_level)
+                ,
         )
         .with(
             file_layer
@@ -74,6 +78,9 @@ pub fn setup_logging_to_stderr_and_rolling_file(
         .with(
             stderr_layer
                 .with_timer(ChronoLocal::rfc_3339())
+                .with_file(false)
+                .with_line_number(false)
+                .with_target(false)
                 .with_filter(stderr_log_level),
         )
         .with(
@@ -89,7 +96,7 @@ pub fn setup_logging_to_stderr_and_rolling_file(
         Err(_) => PathBuf::from(tmp_dir),
     };
 
-    event!(Level::INFO, "log dir = {}", log_dir_abs_path.display());
+    // event!(Level::INFO, "log dir = {}", log_dir_abs_path.display());
 
     Ok(())
 }
