@@ -61,13 +61,11 @@ fn get_env_filter(level: filter::LevelFilter) -> Result<filter::EnvFilter, Error
             .from_env_lossy(),
         Err(_) => {
             let directives = format!(
-                "{},{}={}",
-                filter::LevelFilter::OFF,
+                "{}={},{}",
                 env!("CARGO_PKG_NAME").replace("-", "_"),
                 level,
+                filter::LevelFilter::OFF,
             );
-
-            // eprintln!("directive={}", directives);
 
             filter::EnvFilter::builder().parse(directives)?
             // .add_directive(env!("CARGO_PKG_NAME").replace("-", "_").parse()?)
@@ -75,7 +73,7 @@ fn get_env_filter(level: filter::LevelFilter) -> Result<filter::EnvFilter, Error
         }
     };
 
-    eprintln!("env_filter = {}", env_filter);
+    // eprintln!("env_filter = {}", env_filter);
 
     Ok(env_filter)
 }
