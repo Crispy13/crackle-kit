@@ -6,10 +6,10 @@ use std::{
 };
 
 use anyhow::Error;
-use tracing::{event, Level};
+use tracing::{Level, event};
 use tracing_appender::rolling::{RollingFileAppender, Rotation};
 use tracing_subscriber::{
-    filter, fmt::time::ChronoLocal, layer::SubscriberExt, util::SubscriberInitExt, Layer,
+    Layer, filter, fmt::time::ChronoLocal, layer::SubscriberExt, util::SubscriberInitExt,
 };
 
 pub fn setup_logging_to_stderr_and_file(
@@ -78,11 +78,83 @@ fn get_env_filter(level: filter::LevelFilter) -> Result<filter::EnvFilter, Error
     Ok(env_filter)
 }
 
+/// # Example
+/// ```rust
+/// let stderr_layer = tracing_subscriber::fmt::layer()
+///    .pretty()
+/// .with_writer(io::stderr);
+///
+/// let stderr_log_level = filter::LevelFilter::INFO;
+///
+/// set_default_options_to_stderr!(stderr_layer, stderr_log_level)
+/// ```
+///
+///
+macro_rules! set_default_options_to_stderr {
+    ($stderr_layer:ident, $stderr_log_level:ident) => {
+        $stderr_layer
+            .with_timer(ChronoLocal::rfc_3339())
+            .with_file(false)
+            .with_line_number(false)
+            .with_target(false)
+            .with_ansi(false)
+            .with_filter($stderr_log_level)
+        // .with_filter(get_env_filter(stderr_log_level)?),
+    };
+}
+
+fn set_default_options_to_stderr<W2>(
+    stderr_layer: tracing_subscriber::fmt::Layer<
+        tracing_subscriber::Registry,
+        tracing_subscriber::fmt::format::Pretty,
+        tracing_subscriber::fmt::format::Format<tracing_subscriber::fmt::format::Pretty>,
+        W2,
+    >,
+    stderr_log_level: filter::LevelFilter,
+) -> filter::Filtered<
+    tracing_subscriber::fmt::Layer<
+        tracing_subscriber::Registry,
+        tracing_subscriber::fmt::format::Pretty,
+        tracing_subscriber::fmt::format::Format<
+            tracing_subscriber::fmt::format::Pretty,
+            ChronoLocal,
+        >,
+        W2,
+    >,
+    filter::LevelFilter,
+    tracing_subscriber::Registry,
+>
+where
+    W2: for<'writer> tracing_subscriber::fmt::MakeWriter<'writer> + 'static,
+{
+    stderr_layer
+        .with_timer(ChronoLocal::rfc_3339())
+        .with_file(false)
+        .with_line_number(false)
+        .with_target(false)
+        .with_ansi(false)
+        .with_filter(stderr_log_level)
+}
+
+pub fn setup_logging_stderr_only(stderr_log_level: filter::LevelFilter) -> Result<(), Error> {
+    let stderr_layer = tracing_subscriber::fmt::layer()
+        .pretty()
+        .with_writer(io::stderr);
+
+    Ok(tracing_subscriber::registry()
+        .with(set_default_options_to_stderr(
+            stderr_layer,
+            stderr_log_level,
+        ))
+        .try_init()?)
+}
+
 pub fn setup_logging_to_stderr_and_rolling_file(
     filename_prefix: &str,
     // stderr_log_level: filter::LevelFilter,
 ) -> Result<(), Error> {
     let stderr_log_level = filter::LevelFilter::INFO;
+
     let stderr_layer = tracing_subscriber::fmt::layer()
         .pretty()
         .with_writer(io::stderr);
@@ -98,19 +170,15 @@ pub fn setup_logging_to_stderr_and_rolling_file(
     );
 
     tracing_subscriber::registry()
-        .with(
-            stderr_layer
-                .with_timer(ChronoLocal::rfc_3339())
-                .with_file(false)
-                .with_line_number(false)
-                .with_target(false)
-                .with_filter(get_env_filter(stderr_log_level)?),
-        )
+        .with(set_default_options_to_stderr!(
+            stderr_layer,
+            stderr_log_level
+        ))
         .with(
             file_layer
                 .with_timer(ChronoLocal::rfc_3339())
                 .with_ansi(false)
-                .with_filter(get_env_filter(filter::LevelFilter::DEBUG)?),
+                .with_filter(filter::LevelFilter::DEBUG), // .with_filter(get_env_filter(filter::LevelFilter::DEBUG)?),
         )
         .try_init()?;
 
@@ -124,16 +192,38 @@ pub fn setup_logging_to_stderr_and_rolling_file(
     Ok(())
 }
 
+pub struct SliceDebugWithNewLine<'a, T: std::fmt::Debug>(&'a [T]);
+
+impl<'a, T: std::fmt::Debug> std::fmt::Debug for SliceDebugWithNewLine<'a, T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for elem in self.0 {
+            writeln!(f, "{:?}", elem)?
+        }
+
+        Ok(())
+    }
+}
+
+pub trait SliceDebugWithNewLineTrait<T: std::fmt::Debug> {
+    fn into_debug_with_newline(&self) -> SliceDebugWithNewLine<'_, T>;
+}
+
+impl<'a, T: std::fmt::Debug> SliceDebugWithNewLineTrait<T> for &'a [T] {
+    fn into_debug_with_newline(&self) -> SliceDebugWithNewLine<'_, T> {
+        SliceDebugWithNewLine(&self)
+    }
+}
+
 #[cfg(test)]
 mod test {
-    use tracing::{event, Level};
+    use tracing::{Level, event};
 
     use super::*;
 
     #[test]
     fn test_rolling() {
         // setup_logging_to_stderr_and_file("test.log").unwrap();
-        setup_logging_to_stderr_and_rolling_file("crackle-kit").unwrap();
+        setup_logging_to_stderr_and_rolling_file(env!("CARGO_PKG_NAME")).unwrap();
 
         event!(Level::TRACE, "trace!");
         event!(Level::DEBUG, "debug!");
