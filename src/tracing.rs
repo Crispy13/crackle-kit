@@ -1,16 +1,21 @@
 use std::{
+    any::Any,
+    collections::HashMap,
     env,
     fs::{self, File},
     io,
     path::{Path, PathBuf},
+    sync::Mutex,
 };
 
-use anyhow::Error;
-use tracing::{Level, event};
+use anyhow::{Error, anyhow};
+use tracing::{Level, event, level_filters::LevelFilter};
 use tracing_appender::rolling::{RollingFileAppender, Rotation};
 use tracing_subscriber::{
-    Layer, filter, fmt::time::ChronoLocal, layer::SubscriberExt, util::SubscriberInitExt,
+    Layer, filter, fmt::time::ChronoLocal, layer::SubscriberExt, reload, util::SubscriberInitExt,
 };
+
+use crate::option_ext::{HashMapExt, impl_option_handle_trait};
 
 pub fn setup_logging_to_stderr_and_file(
     file_path: impl AsRef<Path>,
@@ -136,23 +141,142 @@ where
         .with_filter(stderr_log_level)
 }
 
-pub fn setup_logging_stderr_only(stderr_log_level: filter::LevelFilter) -> Result<(), Error> {
+pub fn setup_logging_stderr_only(
+    stderr_log_level: filter::LevelFilter,
+) -> Result<
+    reload::Handle<
+        filter::Filtered<
+            tracing_subscriber::fmt::Layer<
+                tracing_subscriber::Registry,
+                tracing_subscriber::fmt::format::Pretty,
+                tracing_subscriber::fmt::format::Format<
+                    tracing_subscriber::fmt::format::Pretty,
+                    ChronoLocal,
+                >,
+                // W2,
+                impl Fn() -> std::io::Stderr,
+            >,
+            filter::LevelFilter,
+            tracing_subscriber::Registry,
+        >,
+        tracing_subscriber::Registry,
+    >,
+    Error,
+>
+// where
+//     W2: for<'writer> tracing_subscriber::fmt::MakeWriter<'writer> + 'static,
+{
     let stderr_layer = tracing_subscriber::fmt::layer()
         .pretty()
         .with_writer(io::stderr);
 
-    Ok(tracing_subscriber::registry()
-        .with(set_default_options_to_stderr(
-            stderr_layer,
-            stderr_log_level,
-        ))
-        .try_init()?)
+    let filtered_layer = set_default_options_to_stderr(stderr_layer, stderr_log_level);
+
+    let (layer, reload_handle) = reload::Layer::new(filtered_layer);
+
+    tracing_subscriber::registry().with(layer).try_init()?;
+
+    // reload_handle.modify(|filter| {
+    //     *filter.filter_mut() = LevelFilter::DEBUG;
+    // })?;
+
+    Ok(reload_handle)
 }
 
 pub fn setup_logging_to_stderr_and_rolling_file(
     filename_prefix: &str,
     // stderr_log_level: filter::LevelFilter,
-) -> Result<(), Error> {
+) -> Result<
+    (
+        reload::Handle<
+            filter::Filtered<
+                tracing_subscriber::fmt::Layer<
+                    tracing_subscriber::Registry,
+                    tracing_subscriber::fmt::format::Pretty,
+                    tracing_subscriber::fmt::format::Format<
+                        tracing_subscriber::fmt::format::Pretty,
+                        ChronoLocal,
+                    >,
+                    impl Fn() -> io::Stderr,
+                >,
+                LevelFilter,
+                tracing_subscriber::Registry,
+            >,
+            tracing_subscriber::Registry,
+        >,
+        reload::Handle<
+            filter::Filtered<
+                tracing_subscriber::fmt::Layer<
+                    tracing_subscriber::layer::Layered<
+                        reload::Layer<
+                            filter::Filtered<
+                                tracing_subscriber::fmt::Layer<
+                                    tracing_subscriber::Registry,
+                                    tracing_subscriber::fmt::format::Pretty,
+                                    tracing_subscriber::fmt::format::Format<
+                                        tracing_subscriber::fmt::format::Pretty,
+                                        ChronoLocal,
+                                    >,
+                                    impl Fn() -> io::Stderr,
+                                >,
+                                LevelFilter,
+                                tracing_subscriber::Registry,
+                            >,
+                            tracing_subscriber::Registry,
+                        >,
+                        tracing_subscriber::Registry,
+                    >,
+                    tracing_subscriber::fmt::format::Pretty,
+                    tracing_subscriber::fmt::format::Format<
+                        tracing_subscriber::fmt::format::Pretty,
+                        ChronoLocal,
+                    >,
+                    RollingFileAppender,
+                >,
+                LevelFilter,
+                tracing_subscriber::layer::Layered<
+                    reload::Layer<
+                        filter::Filtered<
+                            tracing_subscriber::fmt::Layer<
+                                tracing_subscriber::Registry,
+                                tracing_subscriber::fmt::format::Pretty,
+                                tracing_subscriber::fmt::format::Format<
+                                    tracing_subscriber::fmt::format::Pretty,
+                                    ChronoLocal,
+                                >,
+                                impl Fn() -> io::Stderr,
+                            >,
+                            LevelFilter,
+                            tracing_subscriber::Registry,
+                        >,
+                        tracing_subscriber::Registry,
+                    >,
+                    tracing_subscriber::Registry,
+                >,
+            >,
+            tracing_subscriber::layer::Layered<
+                reload::Layer<
+                    filter::Filtered<
+                        tracing_subscriber::fmt::Layer<
+                            tracing_subscriber::Registry,
+                            tracing_subscriber::fmt::format::Pretty,
+                            tracing_subscriber::fmt::format::Format<
+                                tracing_subscriber::fmt::format::Pretty,
+                                ChronoLocal,
+                            >,
+                            impl Fn() -> io::Stderr,
+                        >,
+                        LevelFilter,
+                        tracing_subscriber::Registry,
+                    >,
+                    tracing_subscriber::Registry,
+                >,
+                tracing_subscriber::Registry,
+            >,
+        >,
+    ),
+    Error,
+> {
     let stderr_log_level = filter::LevelFilter::INFO;
 
     let stderr_layer = tracing_subscriber::fmt::layer()
@@ -169,16 +293,22 @@ pub fn setup_logging_to_stderr_and_rolling_file(
             .build(&tmp_dir)?,
     );
 
+    let (stderr_layer2, stderr_layer_handler) = reload::Layer::new(set_default_options_to_stderr(
+        stderr_layer,
+        stderr_log_level,
+    ));
+
+    let (file_layer2, filelayer_handler) = reload::Layer::new(
+        file_layer
+            .with_timer(ChronoLocal::rfc_3339())
+            .with_ansi(false)
+            .with_filter(filter::LevelFilter::DEBUG),
+    );
+
     tracing_subscriber::registry()
-        .with(set_default_options_to_stderr!(
-            stderr_layer,
-            stderr_log_level
-        ))
+        .with(stderr_layer2)
         .with(
-            file_layer
-                .with_timer(ChronoLocal::rfc_3339())
-                .with_ansi(false)
-                .with_filter(filter::LevelFilter::DEBUG), // .with_filter(get_env_filter(filter::LevelFilter::DEBUG)?),
+            file_layer2, // .with_filter(get_env_filter(filter::LevelFilter::DEBUG)?),
         )
         .try_init()?;
 
@@ -189,7 +319,7 @@ pub fn setup_logging_to_stderr_and_rolling_file(
 
     // event!(Level::INFO, "log dir = {}", log_dir_abs_path.display());
 
-    Ok(())
+    Ok((stderr_layer_handler, filelayer_handler))
 }
 
 pub struct SliceDebugWithNewLine<'a, T: std::fmt::Debug>(&'a [T]);
@@ -214,11 +344,95 @@ impl<'a, T: std::fmt::Debug> SliceDebugWithNewLineTrait<T> for &'a [T] {
     }
 }
 
+trait FilteredModifier {
+    fn filter_mut(&mut self) -> &mut LevelFilter;
+}
+
+impl<L, S> FilteredModifier for filter::Filtered<L, LevelFilter, S> {
+    fn filter_mut(&mut self) -> &mut LevelFilter {
+        self.filter_mut()
+    }
+}
+
+trait ReloadHandler {
+    fn modify_any(&self, f: Box<dyn FnOnce(&mut dyn FilteredModifier)>)
+    -> Result<(), reload::Error>;
+}
+
+impl<L: FilteredModifier + 'static, S> ReloadHandler for reload::Handle<L, S> {
+    fn modify_any(
+        &self,
+        f: Box<dyn FnOnce(&mut dyn FilteredModifier)>,
+    ) -> Result<(), reload::Error> {
+        // Downcast the mutable reference from `Any` back to `L`
+        self.modify(|l: &mut L| {
+            f(l);
+        })
+    }
+}
+
+#[derive(Default)]
+struct TracingControlTower {
+    handler_map: Mutex<HashMap<String, Box<dyn ReloadHandler>>>,
+}
+
+impl TracingControlTower {
+    fn add_handler(&self, name: String, handler: Box<dyn ReloadHandler>) -> Result<(), Error> {
+        self.handler_map
+            .lock()
+            .map_err(|err| anyhow!("{err:?}"))?
+            .insert(name, handler);
+
+        Ok(())
+    }
+
+    fn modify_handler(
+        &self,
+        name: &str,
+        f: Box<dyn FnOnce(&mut dyn FilteredModifier)>,
+    ) -> Result<(), Error> {
+        let mut map = self.handler_map.lock().map_err(|err| anyhow!("{err:?}"))?;
+
+        map.get_mut_or_keyerr(name)?.modify_any(f)?;
+
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod test {
     use tracing::{Level, event};
 
     use super::*;
+
+    #[test]
+    fn test_cc() -> Result<(), Box<dyn std::error::Error>> {
+        let cc = TracingControlTower::default();
+
+        let sh = setup_logging_stderr_only(LevelFilter::DEBUG)?;
+
+        cc.add_handler("stderr".to_owned(), Box::new(sh))?;
+
+        event!(Level::DEBUG, "this will be showed!");
+
+        event!(Level::INFO, "INFO");
+
+        cc.modify_handler("stderr", Box::new(|v| {
+            *v.filter_mut() = LevelFilter::INFO;
+        }))?;
+
+        event!(Level::DEBUG, "this will be not showed!");
+        event!(Level::INFO, "after changing level to INFO, INFO!");
+
+        cc.modify_handler("stderr", Box::new(|v| {
+            *v.filter_mut() = LevelFilter::DEBUG;
+        }))?;
+
+        event!(Level::DEBUG, "Debug will be showed again!");
+        event!(Level::INFO, "after changing level to DEBUG, INFO!");
+
+        Ok(())
+    }
 
     #[test]
     fn test_rolling() {
