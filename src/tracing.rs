@@ -395,11 +395,13 @@ impl TracingControlTower {
     pub fn modify_handler(
         &self,
         name: &str,
-        f: Box<dyn FnOnce(&mut dyn FilteredModifier)>,
+        f: impl FnOnce(&mut dyn FilteredModifier) + 'static,
     ) -> Result<(), Error> {
+        let box_f = Box::new(f);
+
         let mut map = self.handler_map.lock().map_err(|err| anyhow!("{err:?}"))?;
 
-        map.get_mut_or_keyerr(name)?.modify_any(f)?;
+        map.get_mut_or_keyerr(name)?.modify_any(box_f)?;
 
         Ok(())
     }
@@ -430,9 +432,9 @@ mod test {
 
         cc.modify_handler(
             "stderr",
-            Box::new(|v| {
+            |v| {
                 *v.filter_mut() = LevelFilter::INFO;
-            }),
+            },
         )?;
 
         event!(Level::DEBUG, "this will be not showed!");
@@ -440,9 +442,9 @@ mod test {
 
         cc.modify_handler(
             "stderr",
-            Box::new(|v| {
+            |v| {
                 *v.filter_mut() = LevelFilter::DEBUG;
-            }),
+            },
         )?;
 
         event!(Level::DEBUG, "Debug will be showed again!");
