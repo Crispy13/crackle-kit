@@ -5,7 +5,7 @@ use std::{
     fs::{self, File},
     io,
     path::{Path, PathBuf},
-    sync::Mutex,
+    sync::{Mutex, OnceLock},
 };
 
 use anyhow::{Error, anyhow};
@@ -344,7 +344,7 @@ impl<'a, T: std::fmt::Debug> SliceDebugWithNewLineTrait<T> for &'a [T] {
     }
 }
 
-trait FilteredModifier {
+pub trait FilteredModifier {
     fn filter_mut(&mut self) -> &mut LevelFilter;
 }
 
@@ -354,9 +354,11 @@ impl<L, S> FilteredModifier for filter::Filtered<L, LevelFilter, S> {
     }
 }
 
-trait ReloadHandler {
-    fn modify_any(&self, f: Box<dyn FnOnce(&mut dyn FilteredModifier)>)
-    -> Result<(), reload::Error>;
+pub trait ReloadHandler {
+    fn modify_any(
+        &self,
+        f: Box<dyn FnOnce(&mut dyn FilteredModifier)>,
+    ) -> Result<(), reload::Error>;
 }
 
 impl<L: FilteredModifier + 'static, S> ReloadHandler for reload::Handle<L, S> {
@@ -372,12 +374,16 @@ impl<L: FilteredModifier + 'static, S> ReloadHandler for reload::Handle<L, S> {
 }
 
 #[derive(Default)]
-struct TracingControlTower {
-    handler_map: Mutex<HashMap<String, Box<dyn ReloadHandler>>>,
+pub struct TracingControlTower {
+    handler_map: Mutex<HashMap<String, Box<dyn ReloadHandler + Send>>>,
 }
 
 impl TracingControlTower {
-    fn add_handler(&self, name: String, handler: Box<dyn ReloadHandler>) -> Result<(), Error> {
+    pub fn add_handler(
+        &self,
+        name: String,
+        handler: Box<dyn ReloadHandler + Send>,
+    ) -> Result<(), Error> {
         self.handler_map
             .lock()
             .map_err(|err| anyhow!("{err:?}"))?
@@ -386,7 +392,7 @@ impl TracingControlTower {
         Ok(())
     }
 
-    fn modify_handler(
+    pub fn modify_handler(
         &self,
         name: &str,
         f: Box<dyn FnOnce(&mut dyn FilteredModifier)>,
@@ -397,6 +403,11 @@ impl TracingControlTower {
 
         Ok(())
     }
+}
+
+pub fn global_tracing_control_tower() -> &'static TracingControlTower {
+    static CC: OnceLock<TracingControlTower> = OnceLock::new();
+    CC.get_or_init(|| TracingControlTower::default())
 }
 
 #[cfg(test)]
@@ -417,16 +428,22 @@ mod test {
 
         event!(Level::INFO, "INFO");
 
-        cc.modify_handler("stderr", Box::new(|v| {
-            *v.filter_mut() = LevelFilter::INFO;
-        }))?;
+        cc.modify_handler(
+            "stderr",
+            Box::new(|v| {
+                *v.filter_mut() = LevelFilter::INFO;
+            }),
+        )?;
 
         event!(Level::DEBUG, "this will be not showed!");
         event!(Level::INFO, "after changing level to INFO, INFO!");
 
-        cc.modify_handler("stderr", Box::new(|v| {
-            *v.filter_mut() = LevelFilter::DEBUG;
-        }))?;
+        cc.modify_handler(
+            "stderr",
+            Box::new(|v| {
+                *v.filter_mut() = LevelFilter::DEBUG;
+            }),
+        )?;
 
         event!(Level::DEBUG, "Debug will be showed again!");
         event!(Level::INFO, "after changing level to DEBUG, INFO!");
