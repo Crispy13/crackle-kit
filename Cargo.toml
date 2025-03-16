@@ -1,10 +1,23 @@
-[package]
-name = "crackle-kit"
+[workspace]
+resolver = "3"
+members = ["crates/*", "crates/macros/macro_impl"]
+exclude = []
+
+[workspace.package]
 version = "0.1.0"
 edition = "2024"
 
-[dependencies]
+[workspace.dependencies]
 anyhow = "1.0.95"
 tracing = "0.1.41"
 tracing-appender = "0.2.3"
-tracing-subscriber = { version = "0.3.19", features = ["chrono","env-filter"] }
+tracing-subscriber = { version = "0.3.19", features = ["chrono", "env-filter"] }
+macros = { path = "crates/macros" }
+macro_impl = { path = "crates/macros/macro_impl" }
+
+[profile.dev]
+incremental = true
+
+[profile.release]
+lto = 'thin'
+debug = "line-tables-only"
