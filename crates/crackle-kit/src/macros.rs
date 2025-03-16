@@ -1,9 +1,5 @@
 macro_rules! gen_macros_to_impl_bdt_for_enum {
     (impl_start: {$($impl_start:tt)+}, $($variant:ident),+) => {
-        gen_macros_to_impl_bdt_for_enum!(
-            $($variant),+, @dol=$
-        );
-
         $($impl_start)+ {
             fn variant_name(&self) -> &'static str {
                 match self {
@@ -13,9 +9,13 @@ macro_rules! gen_macros_to_impl_bdt_for_enum {
                 }
             }
         }
+
+        gen_macros_to_impl_bdt_for_enum!(
+            @method_macros $($variant),+, @dol=$
+        );
     };
 
-    ($($variant:ident),+, @dol=$dol:tt) => {
+    (@method_macros $($variant:ident),+, @dol=$dol:tt) => {
         macro_rules! gen_method_for_bdt {
             ($enum_value:ident, $method_ident:ident, $dol($args:ident),*) => {
                 match $enum_value {
