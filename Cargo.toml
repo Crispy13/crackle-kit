@@ -14,6 +14,7 @@ tracing-appender = "0.2.3"
 tracing-subscriber = { version = "0.3.19", features = ["chrono", "env-filter"] }
 macros = { path = "crates/macros" }
 macro_impl = { path = "crates/macros/macro_impl" }
+paste = "1.0.15"
 
 [profile.dev]
 incremental = true
