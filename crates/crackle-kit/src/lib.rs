@@ -1,3 +1,3 @@
 pub mod tracing;
-mod option_ext;
+mod err_opt_ext;
 mod macros;

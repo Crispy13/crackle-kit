@@ -15,7 +15,7 @@ use tracing_subscriber::{
     Layer, filter, fmt::time::ChronoLocal, layer::SubscriberExt, reload, util::SubscriberInitExt,
 };
 
-use crate::option_ext::{HashMapExt, impl_option_handle_trait};
+use crate::err_opt_ext::{HashMapExt, impl_option_handle_trait};
 
 pub fn setup_logging_to_stderr_and_file(
     file_path: impl AsRef<Path>,
