@@ -1,6 +1,6 @@
 pub use macro_impl::*;
 
-#[impl_macro_for_enum(name=auto_gen_trait_a_methods)]
+// #[impl_macro_for_enum(name=auto_gen_trait_a_methods)]
 trait A<'a>: Sized {
     type InnerData: 'a;
 
@@ -17,15 +17,72 @@ trait A<'a>: Sized {
     }
 }
 
+
+macro_rules! trait_method_for_enum {
+    ($self:ident, $v:ident, $($code:tt)+) => {
+        match $self {
+            Self::A($v) => $($code)+,
+            Self::B($v) => $($code)+,
+            Self::C($v) => $($code)+,
+        }
+    };
+}
+
+macro_rules! impl_methods_trait_A_for_enum {
+    ($($variant:ident),+) => {
+        fn a(&self) -> u32 {
+            match self {
+                $(
+                    Self::$variant(v) => v.a(),
+                )+
+            }
+        }
+        
+        fn b(&self, rhs: Self) {
+            std::todo!()
+        }
+        
+        fn c(&self, a: i32, b: &str) -> String {
+            std::todo!()
+        }
+    };
+}
+
 enum TestEnum<'a ,T> {
     A(AData),
     B(BData),
     C(CData<'a, T>),
 }
 
+impl<'a, T> A<'a> for TestEnum<'a, T> {
+    type InnerData = ();
+    
+    impl_methods_trait_A_for_enum!(A,B,C);
+}
+
+
+
+
+// impl<'a, T> A<'a> for TestEnum<'a, T> {
+//     type InnerData = ();
+    
+//     fn a(&self) -> u32 {
+//         trait_method_for_enum!(self, v, v.a())
+//     }
+    
+//     fn b(&self, rhs: Self) {
+//         std::todo!()
+//     }
+    
+//     fn c(&self, a: i32, b: &str) -> String {
+//         std::todo!()
+//     }
+    
+// }
+
 // auto_gen_trait_a_methods!(
 //     impl<'a, T> A for TestEnum<'a, T>
-// )
+// );
 
 struct AData;
 
