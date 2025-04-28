@@ -15,6 +15,7 @@ tracing-subscriber = { version = "0.3.19", features = ["chrono", "env-filter"] }
 macros = { path = "crates/macros" }
 macro_impl = { path = "crates/macros/macro_impl" }
 paste = "1.0.15"
+nix = { version = "0.29.0", features = ["fs"] }
 
 [profile.dev]
 incremental = true

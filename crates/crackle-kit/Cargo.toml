@@ -10,3 +10,7 @@ tracing-appender = { workspace = true }
 tracing-subscriber = { workspace = true }
 macros = { workspace = true }
 paste = { workspace = true }
+nix = { workspace = true, optional = true }
+
+[features]
+memfd=["dep:nix"]

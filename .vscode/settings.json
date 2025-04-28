@@ -4,5 +4,9 @@
     },
     "rust-analyzer.runnables.extraEnv": {
         "PATH": "/home/eck/software/miniconda3/envs/rust_build_env/bin:/home/eck/.cargo/bin:/home/eck/software/miniconda3/condabin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/usr/lib/wsl/lib",
-    }
+    },
+    "rust-analyzer.cargo.features": "all",
+    // "rust-analyzer.check.features": [
+    //     "all",
+    // ]
 }
