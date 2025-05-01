@@ -12,7 +12,8 @@ use anyhow::{Error, anyhow};
 use tracing::{Level, event, level_filters::LevelFilter};
 use tracing_appender::rolling::{RollingFileAppender, Rotation};
 use tracing_subscriber::{
-    Layer, filter, fmt::time::ChronoLocal, layer::SubscriberExt, reload, util::SubscriberInitExt,
+    EnvFilter, Layer, filter, fmt::time::ChronoLocal, layer::SubscriberExt, reload,
+    util::SubscriberInitExt,
 };
 
 use crate::err_opt_ext::{HashMapExt, impl_option_handle_trait};
@@ -117,16 +118,20 @@ fn set_default_options_to_stderr<W2>(
     >,
     stderr_log_level: filter::LevelFilter,
 ) -> filter::Filtered<
-    tracing_subscriber::fmt::Layer<
-        tracing_subscriber::Registry,
-        tracing_subscriber::fmt::format::Pretty,
-        tracing_subscriber::fmt::format::Format<
+    filter::Filtered<
+        tracing_subscriber::fmt::Layer<
+            tracing_subscriber::Registry,
             tracing_subscriber::fmt::format::Pretty,
-            ChronoLocal,
+            tracing_subscriber::fmt::format::Format<
+                tracing_subscriber::fmt::format::Pretty,
+                ChronoLocal,
+            >,
+            W2,
         >,
-        W2,
+        EnvFilter,
+        tracing_subscriber::Registry,
     >,
-    filter::LevelFilter,
+    LevelFilter,
     tracing_subscriber::Registry,
 >
 where
@@ -138,6 +143,7 @@ where
         .with_line_number(false)
         .with_target(false)
         .with_ansi(false)
+        .with_filter(EnvFilter::from_default_env())
         .with_filter(stderr_log_level)
 }
 
@@ -146,17 +152,20 @@ pub fn setup_logging_stderr_only(
 ) -> Result<
     reload::Handle<
         filter::Filtered<
-            tracing_subscriber::fmt::Layer<
-                tracing_subscriber::Registry,
-                tracing_subscriber::fmt::format::Pretty,
-                tracing_subscriber::fmt::format::Format<
+            filter::Filtered<
+                tracing_subscriber::fmt::Layer<
+                    tracing_subscriber::Registry,
                     tracing_subscriber::fmt::format::Pretty,
-                    ChronoLocal,
+                    tracing_subscriber::fmt::format::Format<
+                        tracing_subscriber::fmt::format::Pretty,
+                        ChronoLocal,
+                    >,
+                    impl Fn() -> io::Stderr,
                 >,
-                // W2,
-                impl Fn() -> std::io::Stderr,
+                EnvFilter,
+                tracing_subscriber::Registry,
             >,
-            filter::LevelFilter,
+            LevelFilter,
             tracing_subscriber::Registry,
         >,
         tracing_subscriber::Registry,
@@ -190,14 +199,18 @@ pub fn setup_logging_to_stderr_and_rolling_file(
     (
         reload::Handle<
             filter::Filtered<
-                tracing_subscriber::fmt::Layer<
-                    tracing_subscriber::Registry,
-                    tracing_subscriber::fmt::format::Pretty,
-                    tracing_subscriber::fmt::format::Format<
+                filter::Filtered<
+                    tracing_subscriber::fmt::Layer<
+                        tracing_subscriber::Registry,
                         tracing_subscriber::fmt::format::Pretty,
-                        ChronoLocal,
+                        tracing_subscriber::fmt::format::Format<
+                            tracing_subscriber::fmt::format::Pretty,
+                            ChronoLocal,
+                        >,
+                        impl Fn() -> io::Stderr,
                     >,
-                    impl Fn() -> io::Stderr,
+                    EnvFilter,
+                    tracing_subscriber::Registry,
                 >,
                 LevelFilter,
                 tracing_subscriber::Registry,
@@ -210,14 +223,18 @@ pub fn setup_logging_to_stderr_and_rolling_file(
                     tracing_subscriber::layer::Layered<
                         reload::Layer<
                             filter::Filtered<
-                                tracing_subscriber::fmt::Layer<
-                                    tracing_subscriber::Registry,
-                                    tracing_subscriber::fmt::format::Pretty,
-                                    tracing_subscriber::fmt::format::Format<
+                                filter::Filtered<
+                                    tracing_subscriber::fmt::Layer<
+                                        tracing_subscriber::Registry,
                                         tracing_subscriber::fmt::format::Pretty,
-                                        ChronoLocal,
+                                        tracing_subscriber::fmt::format::Format<
+                                            tracing_subscriber::fmt::format::Pretty,
+                                            ChronoLocal,
+                                        >,
+                                        impl Fn() -> io::Stderr,
                                     >,
-                                    impl Fn() -> io::Stderr,
+                                    EnvFilter,
+                                    tracing_subscriber::Registry,
                                 >,
                                 LevelFilter,
                                 tracing_subscriber::Registry,
@@ -237,14 +254,18 @@ pub fn setup_logging_to_stderr_and_rolling_file(
                 tracing_subscriber::layer::Layered<
                     reload::Layer<
                         filter::Filtered<
-                            tracing_subscriber::fmt::Layer<
-                                tracing_subscriber::Registry,
-                                tracing_subscriber::fmt::format::Pretty,
-                                tracing_subscriber::fmt::format::Format<
+                            filter::Filtered<
+                                tracing_subscriber::fmt::Layer<
+                                    tracing_subscriber::Registry,
                                     tracing_subscriber::fmt::format::Pretty,
-                                    ChronoLocal,
+                                    tracing_subscriber::fmt::format::Format<
+                                        tracing_subscriber::fmt::format::Pretty,
+                                        ChronoLocal,
+                                    >,
+                                    impl Fn() -> io::Stderr,
                                 >,
-                                impl Fn() -> io::Stderr,
+                                EnvFilter,
+                                tracing_subscriber::Registry,
                             >,
                             LevelFilter,
                             tracing_subscriber::Registry,
@@ -257,14 +278,18 @@ pub fn setup_logging_to_stderr_and_rolling_file(
             tracing_subscriber::layer::Layered<
                 reload::Layer<
                     filter::Filtered<
-                        tracing_subscriber::fmt::Layer<
-                            tracing_subscriber::Registry,
-                            tracing_subscriber::fmt::format::Pretty,
-                            tracing_subscriber::fmt::format::Format<
+                        filter::Filtered<
+                            tracing_subscriber::fmt::Layer<
+                                tracing_subscriber::Registry,
                                 tracing_subscriber::fmt::format::Pretty,
-                                ChronoLocal,
+                                tracing_subscriber::fmt::format::Format<
+                                    tracing_subscriber::fmt::format::Pretty,
+                                    ChronoLocal,
+                                >,
+                                impl Fn() -> io::Stderr,
                             >,
-                            impl Fn() -> io::Stderr,
+                            EnvFilter,
+                            tracing_subscriber::Registry,
                         >,
                         LevelFilter,
                         tracing_subscriber::Registry,
@@ -354,6 +379,7 @@ impl<L, S> FilteredModifier for filter::Filtered<L, LevelFilter, S> {
     }
 }
 
+
 pub trait ReloadHandler {
     fn modify_any(
         &self,
@@ -430,22 +456,16 @@ mod test {
 
         event!(Level::INFO, "INFO");
 
-        cc.modify_handler(
-            "stderr",
-            |v| {
-                *v.filter_mut() = LevelFilter::INFO;
-            },
-        )?;
+        cc.modify_handler("stderr", |v| {
+            *v.filter_mut() = LevelFilter::INFO;
+        })?;
 
         event!(Level::DEBUG, "this will be not showed!");
         event!(Level::INFO, "after changing level to INFO, INFO!");
 
-        cc.modify_handler(
-            "stderr",
-            |v| {
-                *v.filter_mut() = LevelFilter::DEBUG;
-            },
-        )?;
+        cc.modify_handler("stderr", |v| {
+            *v.filter_mut() = LevelFilter::DEBUG;
+        })?;
 
         event!(Level::DEBUG, "Debug will be showed again!");
         event!(Level::INFO, "after changing level to DEBUG, INFO!");
