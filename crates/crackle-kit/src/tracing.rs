@@ -16,7 +16,8 @@ use tracing_subscriber::{
     util::SubscriberInitExt,
 };
 
-use crate::err_opt_ext::{HashMapExt, impl_option_handle_trait};
+// use crate::err_opt_ext::{HashMapExt, impl_option_handle_trait};
+// TODO: replace levelfilter with envfilter(level filter included)
 
 pub fn setup_logging_to_stderr_and_file(
     file_path: impl AsRef<Path>,
@@ -118,20 +119,16 @@ fn set_default_options_to_stderr<W2>(
     >,
     stderr_log_level: filter::LevelFilter,
 ) -> filter::Filtered<
-    filter::Filtered<
-        tracing_subscriber::fmt::Layer<
-            tracing_subscriber::Registry,
-            tracing_subscriber::fmt::format::Pretty,
-            tracing_subscriber::fmt::format::Format<
-                tracing_subscriber::fmt::format::Pretty,
-                ChronoLocal,
-            >,
-            W2,
-        >,
-        EnvFilter,
+    tracing_subscriber::fmt::Layer<
         tracing_subscriber::Registry,
+        tracing_subscriber::fmt::format::Pretty,
+        tracing_subscriber::fmt::format::Format<
+            tracing_subscriber::fmt::format::Pretty,
+            ChronoLocal,
+        >,
+        W2,
     >,
-    LevelFilter,
+    EnvFilter,
     tracing_subscriber::Registry,
 >
 where
@@ -143,8 +140,12 @@ where
         .with_line_number(false)
         .with_target(false)
         .with_ansi(false)
-        .with_filter(EnvFilter::from_default_env())
-        .with_filter(stderr_log_level)
+        .with_filter(
+            EnvFilter::builder()
+                .with_default_directive(stderr_log_level.into())
+                .from_env_lossy(),
+        )
+    // .with_filter(stderr_log_level)
 }
 
 pub fn setup_logging_stderr_only(
@@ -152,20 +153,16 @@ pub fn setup_logging_stderr_only(
 ) -> Result<
     reload::Handle<
         filter::Filtered<
-            filter::Filtered<
-                tracing_subscriber::fmt::Layer<
-                    tracing_subscriber::Registry,
-                    tracing_subscriber::fmt::format::Pretty,
-                    tracing_subscriber::fmt::format::Format<
-                        tracing_subscriber::fmt::format::Pretty,
-                        ChronoLocal,
-                    >,
-                    impl Fn() -> io::Stderr,
-                >,
-                EnvFilter,
+            tracing_subscriber::fmt::Layer<
                 tracing_subscriber::Registry,
+                tracing_subscriber::fmt::format::Pretty,
+                tracing_subscriber::fmt::format::Format<
+                    tracing_subscriber::fmt::format::Pretty,
+                    ChronoLocal,
+                >,
+                impl Fn() -> io::Stderr,
             >,
-            LevelFilter,
+            EnvFilter,
             tracing_subscriber::Registry,
         >,
         tracing_subscriber::Registry,
@@ -199,20 +196,16 @@ pub fn setup_logging_to_stderr_and_rolling_file(
     (
         reload::Handle<
             filter::Filtered<
-                filter::Filtered<
-                    tracing_subscriber::fmt::Layer<
-                        tracing_subscriber::Registry,
-                        tracing_subscriber::fmt::format::Pretty,
-                        tracing_subscriber::fmt::format::Format<
-                            tracing_subscriber::fmt::format::Pretty,
-                            ChronoLocal,
-                        >,
-                        impl Fn() -> io::Stderr,
-                    >,
-                    EnvFilter,
+                tracing_subscriber::fmt::Layer<
                     tracing_subscriber::Registry,
+                    tracing_subscriber::fmt::format::Pretty,
+                    tracing_subscriber::fmt::format::Format<
+                        tracing_subscriber::fmt::format::Pretty,
+                        ChronoLocal,
+                    >,
+                    impl Fn() -> io::Stderr,
                 >,
-                LevelFilter,
+                EnvFilter,
                 tracing_subscriber::Registry,
             >,
             tracing_subscriber::Registry,
@@ -223,20 +216,16 @@ pub fn setup_logging_to_stderr_and_rolling_file(
                     tracing_subscriber::layer::Layered<
                         reload::Layer<
                             filter::Filtered<
-                                filter::Filtered<
-                                    tracing_subscriber::fmt::Layer<
-                                        tracing_subscriber::Registry,
-                                        tracing_subscriber::fmt::format::Pretty,
-                                        tracing_subscriber::fmt::format::Format<
-                                            tracing_subscriber::fmt::format::Pretty,
-                                            ChronoLocal,
-                                        >,
-                                        impl Fn() -> io::Stderr,
-                                    >,
-                                    EnvFilter,
+                                tracing_subscriber::fmt::Layer<
                                     tracing_subscriber::Registry,
+                                    tracing_subscriber::fmt::format::Pretty,
+                                    tracing_subscriber::fmt::format::Format<
+                                        tracing_subscriber::fmt::format::Pretty,
+                                        ChronoLocal,
+                                    >,
+                                    impl Fn() -> io::Stderr,
                                 >,
-                                LevelFilter,
+                                EnvFilter,
                                 tracing_subscriber::Registry,
                             >,
                             tracing_subscriber::Registry,
@@ -254,31 +243,6 @@ pub fn setup_logging_to_stderr_and_rolling_file(
                 tracing_subscriber::layer::Layered<
                     reload::Layer<
                         filter::Filtered<
-                            filter::Filtered<
-                                tracing_subscriber::fmt::Layer<
-                                    tracing_subscriber::Registry,
-                                    tracing_subscriber::fmt::format::Pretty,
-                                    tracing_subscriber::fmt::format::Format<
-                                        tracing_subscriber::fmt::format::Pretty,
-                                        ChronoLocal,
-                                    >,
-                                    impl Fn() -> io::Stderr,
-                                >,
-                                EnvFilter,
-                                tracing_subscriber::Registry,
-                            >,
-                            LevelFilter,
-                            tracing_subscriber::Registry,
-                        >,
-                        tracing_subscriber::Registry,
-                    >,
-                    tracing_subscriber::Registry,
-                >,
-            >,
-            tracing_subscriber::layer::Layered<
-                reload::Layer<
-                    filter::Filtered<
-                        filter::Filtered<
                             tracing_subscriber::fmt::Layer<
                                 tracing_subscriber::Registry,
                                 tracing_subscriber::fmt::format::Pretty,
@@ -291,7 +255,24 @@ pub fn setup_logging_to_stderr_and_rolling_file(
                             EnvFilter,
                             tracing_subscriber::Registry,
                         >,
-                        LevelFilter,
+                        tracing_subscriber::Registry,
+                    >,
+                    tracing_subscriber::Registry,
+                >,
+            >,
+            tracing_subscriber::layer::Layered<
+                reload::Layer<
+                    filter::Filtered<
+                        tracing_subscriber::fmt::Layer<
+                            tracing_subscriber::Registry,
+                            tracing_subscriber::fmt::format::Pretty,
+                            tracing_subscriber::fmt::format::Format<
+                                tracing_subscriber::fmt::format::Pretty,
+                                ChronoLocal,
+                            >,
+                            impl Fn() -> io::Stderr,
+                        >,
+                        EnvFilter,
                         tracing_subscriber::Registry,
                     >,
                     tracing_subscriber::Registry,
@@ -369,16 +350,26 @@ impl<'a, T: std::fmt::Debug> SliceDebugWithNewLineTrait<T> for &'a [T] {
     }
 }
 
+pub enum TracingFilterMut<'a> {
+    LevelFilter(&'a mut LevelFilter),
+    EnvFilter(&'a mut EnvFilter),
+}
+
 pub trait FilteredModifier {
-    fn filter_mut(&mut self) -> &mut LevelFilter;
+    fn filter_mut(&mut self) -> TracingFilterMut<'_>;
 }
 
 impl<L, S> FilteredModifier for filter::Filtered<L, LevelFilter, S> {
-    fn filter_mut(&mut self) -> &mut LevelFilter {
-        self.filter_mut()
+    fn filter_mut(&mut self) -> TracingFilterMut<'_> {
+        TracingFilterMut::LevelFilter(self.filter_mut())
     }
 }
 
+impl<L, S> FilteredModifier for filter::Filtered<L, EnvFilter, S> {
+    fn filter_mut(&mut self) -> TracingFilterMut<'_> {
+        TracingFilterMut::EnvFilter(self.filter_mut())
+    }
+}
 
 pub trait ReloadHandler {
     fn modify_any(
@@ -427,7 +418,9 @@ impl TracingControlTower {
 
         let mut map = self.handler_map.lock().map_err(|err| anyhow!("{err:?}"))?;
 
-        map.get_mut_or_keyerr(name)?.modify_any(box_f)?;
+        map.get_mut(name)
+            .ok_or_else(|| anyhow!("Key {} not found", name))?
+            .modify_any(box_f)?;
 
         Ok(())
     }
@@ -456,15 +449,29 @@ mod test {
 
         event!(Level::INFO, "INFO");
 
-        cc.modify_handler("stderr", |v| {
-            *v.filter_mut() = LevelFilter::INFO;
+        cc.modify_handler("stderr", |v| match v.filter_mut() {
+            TracingFilterMut::LevelFilter(level_filter) => {
+                *level_filter = LevelFilter::INFO;
+            }
+            TracingFilterMut::EnvFilter(env_filter) => {
+                *env_filter = EnvFilter::builder()
+                    .with_default_directive(LevelFilter::INFO.into())
+                    .from_env_lossy();
+            }
         })?;
 
         event!(Level::DEBUG, "this will be not showed!");
         event!(Level::INFO, "after changing level to INFO, INFO!");
 
-        cc.modify_handler("stderr", |v| {
-            *v.filter_mut() = LevelFilter::DEBUG;
+        cc.modify_handler("stderr", |v| match v.filter_mut() {
+            TracingFilterMut::LevelFilter(level_filter) => {
+                *level_filter = LevelFilter::DEBUG;
+            }
+            TracingFilterMut::EnvFilter(env_filter) => {
+                *env_filter = EnvFilter::builder()
+                    .with_default_directive(LevelFilter::DEBUG.into())
+                    .from_env_lossy();
+            }
         })?;
 
         event!(Level::DEBUG, "Debug will be showed again!");
