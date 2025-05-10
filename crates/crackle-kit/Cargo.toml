@@ -11,6 +11,9 @@ tracing-subscriber = { workspace = true }
 macros = { workspace = true }
 paste = { workspace = true }
 nix = { workspace = true, optional = true }
+flate2 = { workspace = true, optional = true }
+crossbeam-channel = { workspace = true, optional = true }
 
 [features]
-memfd=["dep:nix"]
+memfd = ["dep:nix"]
+fastq = ["dep:flate2", "dep:crossbeam-channel"]

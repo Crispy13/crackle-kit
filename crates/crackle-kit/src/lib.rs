@@ -4,3 +4,6 @@ mod macros;
 
 #[cfg(feature="memfd")]
 mod memfd_file;
+
+#[cfg(feature="fastq")]
+mod fastq;
