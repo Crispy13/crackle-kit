@@ -117,6 +117,19 @@ impl FastqRecord {
         std::str::from_utf8(&self.buf[0..self.indices[0]]).expect("Invalid UTF-8 in header")
     }
 
+    pub fn header_bytes(&self) -> &[u8] {
+        &self.buf[0..self.indices[0]]
+    }
+
+    pub fn header_id_bytes(&self) -> &[u8] {
+        let header = &self.buf[0..self.indices[0]];
+        // Find the position of the first whitespace
+        match header.iter().position(|b| b.is_ascii_whitespace()) {
+            Some(pos) => &header[0..pos],
+            None => header, // Return the entire header if no whitespace found
+        }
+    }
+
     /// Returns the sequence as a &str.
     pub fn sequence(&self) -> &str {
         std::str::from_utf8(&self.buf[self.indices[0]..self.indices[1]])
@@ -205,8 +218,8 @@ impl PairedFastqReaderConfig {
         Self {
             r1_filename: r1_filename.as_ref().to_path_buf(),
             r2_filename: r2_filename.as_ref().to_path_buf(),
-            batch_size: 1024,  // Fixed records per batch.
-            pool_capacity: 64, // Fixed number of batches.
+            batch_size: 1024,    // Fixed records per batch.
+            pool_capacity: 512, // Fixed number of batches.
         }
     }
 
@@ -414,8 +427,12 @@ mod tests {
 
     #[test]
     fn test_reader() -> Result<(), Box<dyn std::error::Error>> {
-        let mut handle = PairedFastqReaderConfig::new(R1, R2).run()?;
+        let mut handle = PairedFastqReaderConfig::new(R1, R2);
 
+        // handle.pool_capacity = 512;
+
+        let mut handle = handle.run()?;
+        
         let mut record1 = FastqRecord::new();
         let mut record2 = FastqRecord::new();
 
