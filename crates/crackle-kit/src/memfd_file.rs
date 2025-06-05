@@ -7,7 +7,7 @@ use std::{
 };
 
 use anyhow::Error;
-use nix::sys::memfd::{MemFdCreateFlag, memfd_create};
+use nix::sys::memfd::{MFdFlags, memfd_create};
 
 pub struct MemFdFile {
     file: File,
@@ -19,9 +19,9 @@ impl MemFdFile {
     ///
     /// This function creates an anonymous in‑memory file. It returns a `MemFdFile`
     /// which wraps the underlying file descriptor.
-    pub fn new(name: impl Into<Vec<u8>>, flags: MemFdCreateFlag) -> Result<Self, Error> {
+    pub fn new(name: &str, flags: MFdFlags) -> Result<Self, Error> {
         // Create the memfd file descriptor.
-        let fd = memfd_create(&CString::new(name)?, flags)?;
+        let fd = memfd_create(name, flags)?;
 
         let file = unsafe { File::from_raw_fd(fd.into_raw_fd()) };
         let path = PathBuf::from(format!("/proc/self/fd/{}", file.as_raw_fd()));
@@ -35,7 +35,7 @@ impl MemFdFile {
     pub fn from_path(
         source_path: impl AsRef<Path>,
         memfd_name: &str,
-        flags: MemFdCreateFlag,
+        flags: MFdFlags,
     ) -> Result<Self, Error> {
         // Open the source file (for example, a BAM file stored on disk).
         let mut source_file = File::open(source_path)?;

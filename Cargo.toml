@@ -15,7 +15,7 @@ tracing-subscriber = { version = "0.3.19", features = ["chrono", "env-filter"] }
 macros = { path = "crates/macros" }
 macro_impl = { path = "crates/macros/macro_impl" }
 paste = "1.0.15"
-nix = { version = "0.29.0", features = ["fs"] }
+nix = { version = "0.30.1", features = ["fs"] }
 flate2 = { version = "1.1.1", features = ["zlib-rs"], default-features = false }
 crossbeam-channel = { version = "0.5.15" }
 

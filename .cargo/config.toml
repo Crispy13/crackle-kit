@@ -3,4 +3,5 @@ rustflags = [
     "-C",
     "link-arg=-fuse-ld=lld",
     # "-Clink-arg=-Wl,--no-rosegment"
+    "-C", "target-cpu=native"
 ]
