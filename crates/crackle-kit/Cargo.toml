@@ -13,6 +13,7 @@ paste = { workspace = true }
 nix = { workspace = true, optional = true }
 flate2 = { workspace = true, optional = true }
 crossbeam-channel = { workspace = true, optional = true }
+indicatif = "0.17.11"
 
 [features]
 memfd = ["dep:nix"]

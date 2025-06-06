@@ -7,3 +7,6 @@ mod memfd_file;
 
 #[cfg(feature="fastq")]
 mod fastq;
+
+mod pbar;
+mod nuc_base_map;
