@@ -40,7 +40,7 @@ impl<T> NucBaseMap<T> {
         Self::NUC_IDX_ARR[nuc_base as usize]
     }
 
-    fn get(&self, nuc_base: u8) -> Option<&T> {
+    pub fn get(&self, nuc_base: u8) -> Option<&T> {
         let idx = Self::get_nuc_idx(nuc_base);
 
         if idx < 5 {
@@ -50,7 +50,7 @@ impl<T> NucBaseMap<T> {
         }
     }
 
-    fn get_mut(&mut self, nuc_base: u8) -> Option<&mut T> {
+    pub fn get_mut(&mut self, nuc_base: u8) -> Option<&mut T> {
         let idx = Self::get_nuc_idx(nuc_base);
 
         if idx < 5 {
@@ -61,12 +61,12 @@ impl<T> NucBaseMap<T> {
     }
 
     /// iteration order: A T C G N
-    fn iter(&self) -> std::slice::Iter<'_, T> {
+    pub fn iter(&self) -> std::slice::Iter<'_, T> {
         self.inner.iter()
     }
 
     /// iteration order: A T C G N
-    fn iter_mut(&mut self) -> std::slice::IterMut<'_, T> {
+    pub fn iter_mut(&mut self) -> std::slice::IterMut<'_, T> {
         self.inner.iter_mut()
     }
 }

@@ -10,3 +10,6 @@ mod fastq;
 
 mod pbar;
 mod nuc_base_map;
+mod utils;
+
+mod data;

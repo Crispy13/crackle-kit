@@ -148,6 +148,44 @@ where
     // .with_filter(stderr_log_level)
 }
 
+fn set_default_options_to_stderr_debug<W2>(
+    stderr_layer: tracing_subscriber::fmt::Layer<
+        tracing_subscriber::Registry,
+        tracing_subscriber::fmt::format::Pretty,
+        tracing_subscriber::fmt::format::Format<tracing_subscriber::fmt::format::Pretty>,
+        W2,
+    >,
+    stderr_log_level: filter::LevelFilter,
+) -> filter::Filtered<
+    tracing_subscriber::fmt::Layer<
+        tracing_subscriber::Registry,
+        tracing_subscriber::fmt::format::Pretty,
+        tracing_subscriber::fmt::format::Format<
+            tracing_subscriber::fmt::format::Pretty,
+            ChronoLocal,
+        >,
+        W2,
+    >,
+    EnvFilter,
+    tracing_subscriber::Registry,
+>
+where
+    W2: for<'writer> tracing_subscriber::fmt::MakeWriter<'writer> + 'static,
+{
+    stderr_layer
+        .with_timer(ChronoLocal::rfc_3339())
+        .with_file(true)
+        .with_line_number(true)
+        .with_target(true)
+        .with_ansi(false)
+        .with_filter(
+            EnvFilter::builder()
+                .with_default_directive(stderr_log_level.into())
+                .from_env_lossy(),
+        )
+    // .with_filter(stderr_log_level)
+}
+
 pub fn setup_logging_stderr_only(
     stderr_log_level: filter::LevelFilter,
 ) -> Result<
@@ -177,6 +215,47 @@ pub fn setup_logging_stderr_only(
         .with_writer(io::stderr);
 
     let filtered_layer = set_default_options_to_stderr(stderr_layer, stderr_log_level);
+
+    let (layer, reload_handle) = reload::Layer::new(filtered_layer);
+
+    tracing_subscriber::registry().with(layer).try_init()?;
+
+    // reload_handle.modify(|filter| {
+    //     *filter.filter_mut() = LevelFilter::DEBUG;
+    // })?;
+
+    Ok(reload_handle)
+}
+
+pub fn setup_logging_stderr_only_debug(
+    stderr_log_level: filter::LevelFilter,
+) -> Result<
+    reload::Handle<
+        filter::Filtered<
+            tracing_subscriber::fmt::Layer<
+                tracing_subscriber::Registry,
+                tracing_subscriber::fmt::format::Pretty,
+                tracing_subscriber::fmt::format::Format<
+                    tracing_subscriber::fmt::format::Pretty,
+                    ChronoLocal,
+                >,
+                impl Fn() -> io::Stderr,
+            >,
+            EnvFilter,
+            tracing_subscriber::Registry,
+        >,
+        tracing_subscriber::Registry,
+    >,
+    Error,
+>
+// where
+//     W2: for<'writer> tracing_subscriber::fmt::MakeWriter<'writer> + 'static,
+{
+    let stderr_layer = tracing_subscriber::fmt::layer()
+        .pretty()
+        .with_writer(io::stderr);
+
+    let filtered_layer = set_default_options_to_stderr_debug(stderr_layer, stderr_log_level);
 
     let (layer, reload_handle) = reload::Layer::new(filtered_layer);
 
@@ -436,7 +515,7 @@ mod test {
     use tracing::{Level, event};
 
     use super::*;
-
+    
     #[test]
     fn test_cc() -> Result<(), Box<dyn std::error::Error>> {
         let cc = TracingControlTower::default();

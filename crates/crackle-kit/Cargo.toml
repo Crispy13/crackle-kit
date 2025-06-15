@@ -12,9 +12,9 @@ macros = { workspace = true }
 paste = { workspace = true }
 nix = { workspace = true, optional = true }
 flate2 = { workspace = true, optional = true }
-crossbeam-channel = { workspace = true, optional = true }
-indicatif = "0.17.11"
+crossbeam-channel = { workspace = true }
+indicatif = { workspace = true }
 
 [features]
 memfd = ["dep:nix"]
-fastq = ["dep:flate2", "dep:crossbeam-channel"]
+fastq = ["dep:flate2"]
