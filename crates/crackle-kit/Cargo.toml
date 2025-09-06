@@ -14,7 +14,9 @@ nix = { workspace = true, optional = true }
 flate2 = { workspace = true, optional = true }
 crossbeam-channel = { workspace = true }
 indicatif = { workspace = true }
+rust-htslib = { git = "https://github.com/Crispy13/rust-htslib", branch = "dev", optional=true }
 
 [features]
 memfd = ["dep:nix"]
 fastq = ["dep:flate2"]
+bam = ["dep:rust-htslib"]

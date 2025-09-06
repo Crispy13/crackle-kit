@@ -2,13 +2,13 @@ use anyhow::{Error, anyhow};
 use crossbeam_channel::{Receiver, SendError, Sender, bounded};
 
 pub struct ChannelPair<T> {
-    pub tx: Sender<T>,
-    pub rx: Receiver<T>,
+    pub tx: crossbeam_channel::Sender<T>,
+    pub rx: crossbeam_channel::Receiver<T>,
 }
 
 impl<T> ChannelPair<T> {
-    fn new_full(data_init: impl Fn() -> T, capacity: usize) -> Result<ChannelPair<T>, Error> {
-        let (tx, rx) = bounded(capacity);
+    pub fn new_full(data_init: impl Fn() -> T, capacity: usize) -> Result<ChannelPair<T>, Error> {
+        let (tx, rx) = crossbeam_channel::bounded(capacity);
 
         for _ in 0..capacity {
             match tx.send(data_init()) {
@@ -18,6 +18,10 @@ impl<T> ChannelPair<T> {
         }
 
         Ok(Self { tx, rx })
+    }
+
+    pub fn into_sender_receiver_tup(self) -> (Sender<T>, Receiver<T>) {
+        (self.tx, self.rx)
     }
 }
 
@@ -72,6 +76,3 @@ impl<T> BatchedChannel<T> {
     }
 }
 
-pub trait BatchedChannelData {
-    fn clear(&mut self);
-}
