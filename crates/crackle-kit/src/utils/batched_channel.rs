@@ -1,6 +1,8 @@
 use anyhow::{Error, anyhow};
 use crossbeam_channel::{Receiver, SendError, Sender, bounded};
 
+use crate::utils::batched_data::BatchedData;
+
 pub struct ChannelPair<T> {
     pub tx: crossbeam_channel::Sender<T>,
     pub rx: crossbeam_channel::Receiver<T>,
@@ -47,17 +49,23 @@ Needed
 /// }
 /// ```
 pub struct BatchedChannel<T> {
-    data: ChannelPair<Vec<T>>,
-    buffer: ChannelPair<Vec<T>>,
+    data: ChannelPair<BatchedData<T>>,
+    buffer: ChannelPair<BatchedData<T>>,
 }
 
 impl<T> BatchedChannel<T> {
-    fn new(data_init: impl Fn() -> T, batch_size: usize, pool_size: usize) -> Result<Self, Error> {
-        let (tx_buf, rx_buf) = bounded(pool_size);
-        let (tx_data, rx_data) = bounded(pool_size);
+    fn new(
+        data_init: impl Fn() -> T,
+        data_batch_size: usize,
+        channel_capacity: usize,
+    ) -> Result<Self, Error> {
+        let (tx_buf, rx_buf) = bounded(channel_capacity);
+        let (tx_data, rx_data) = bounded(channel_capacity);
 
-        for i in 0..pool_size {
-            match tx_buf.send((0..batch_size).map(|_| data_init()).collect()) {
+        for i in 0..channel_capacity {
+            match tx_buf.send(BatchedData::from_vec(
+                (0..data_batch_size).map(|_| data_init()).collect(),
+            )) {
                 Ok(_) => {}
                 Err(err) => Err(anyhow!("{err:?}"))?,
             }
@@ -76,3 +84,13 @@ impl<T> BatchedChannel<T> {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn test_init() -> Result<(), Box<dyn std::error::Error>> {
+        let bc = BatchedChannel::new(|| String::new(), 1024, 1024)?;
+        
+        Ok(())
+    }
+}

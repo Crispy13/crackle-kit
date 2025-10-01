@@ -143,7 +143,7 @@ macro_rules! gen_macros_to_impl_trait_for_enum {
                 };
             }
         }
-        
+
 
 
     };
@@ -249,3 +249,6 @@ trait BDTMethods {
 
     fn ssdf(&self, a: i32, b: i32) -> String;
 }
+
+
+

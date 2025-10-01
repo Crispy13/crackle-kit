@@ -1,3 +1,7 @@
+#[cfg(feature = "bio")]
+use self::fasta::*;
+use std::path::Path;
+
 pub fn make_bins(start: usize, end: usize, bin_size: usize) -> Vec<(usize, usize)> {
     let mut bin_ranges = (start..end)
         .step_by(bin_size)
@@ -16,6 +20,32 @@ pub fn make_bins(start: usize, end: usize, bin_size: usize) -> Vec<(usize, usize
     }
 
     bin_ranges
+}
+
+#[cfg(feature = "bio")]
+mod fasta {
+    use std::{collections::HashMap, str::FromStr};
+
+    use crate::data::chrom::Chrom;
+
+    use super::*;
+    use anyhow::Error;
+    use bio::io::fasta::IndexedReader;
+
+    pub fn make_bins_from_fasta(
+        fasta_file: impl AsRef<Path>,
+        bin_size: usize,
+    ) -> Result<HashMap<Chrom, Vec<(usize, usize)>>, Error> {
+        let ir = IndexedReader::from_file(&fasta_file.as_ref())?;
+
+        let mut res = HashMap::with_capacity(ir.index.sequences().len());
+        for seq in ir.index.sequences() {
+            let bins = make_bins(0, seq.len as usize, bin_size);
+            res.insert(Chrom::from_str(&seq.name).unwrap(), bins);
+        }
+
+        Ok(res)
+    }
 }
 
 // --- Test Functions ---
@@ -117,5 +147,68 @@ mod tests {
         // Test with start > end, should result in an empty vector
         let bins = make_bins(100, 50, 10);
         assert_eq!(bins, vec![]);
+    }
+}
+
+#[cfg(test)]
+#[cfg(feature = "bio")]
+mod fasta_tests {
+    use crate::data::chrom::Chrom;
+
+    use super::*;
+
+    #[test]
+    fn test_make_bins_from_fasta() {
+        use std::collections::HashMap;
+        use std::fs::File;
+        use std::io::Write;
+
+        use crate::data::chrom::Chrom;
+
+        // 1. Create a dummy FASTA file
+        let fasta_path = "test_bins.fa";
+        let mut fasta_file = File::create(fasta_path).unwrap();
+        writeln!(fasta_file, ">chr1").unwrap();
+        writeln!(fasta_file, "ACGTACGTACGT").unwrap(); // 12 bases
+        writeln!(fasta_file, ">chrM").unwrap();
+        writeln!(fasta_file, "NNNNN").unwrap(); // 5 bases
+
+        // 2. Create a corresponding FASTA index file (.fai)
+        let fai_path = "test_bins.fa.fai";
+        let mut fai_file = File::create(fai_path).unwrap();
+        // Format: name, length, offset, line_bases, line_width
+        writeln!(fai_file, "chr1\t12\t6\t12\t13").unwrap();
+        writeln!(fai_file, "chrM\t5\t25\t5\t6").unwrap();
+
+        // 3. Call the function to be tested
+        let bin_size = 10;
+        let result = fasta::make_bins_from_fasta(fasta_path, bin_size).unwrap();
+
+        // 4. Define the expected output
+        let mut expected = HashMap::new();
+        expected.insert(Chrom::Chr1, vec![(0, 10), (10, 12)]);
+        expected.insert(Chrom::ChrM, vec![(0, 5)]);
+
+        // 5. Assert correctness
+        assert_eq!(result.len(), 2);
+        assert_eq!(result.get(&Chrom::Chr1), Some(&vec![(0, 10), (10, 12)]));
+        assert_eq!(result.get(&Chrom::ChrM), Some(&vec![(0, 5)]));
+        assert_eq!(result, expected);
+
+        // 6. Clean up the dummy files
+        std::fs::remove_file(fasta_path).unwrap();
+        std::fs::remove_file(fai_path).unwrap();
+    }
+
+    #[test]
+    fn make_bins_using_grch38_fasta() -> Result<(), Box<dyn std::error::Error>> {
+        let fasta_file =
+            "/home/eck/workspace/common_resources/GCF_000001405.40_GRCh38.p14_genomic.fna.gz";
+        let mut bin_map = make_bins_from_fasta(fasta_file, 100_000_000)?;
+        bin_map.retain(|k, v| ["NC_000002.12", "NC_000001.11"].contains(&k.as_str()));
+
+        println!("{:?}", bin_map);
+
+        Ok(())
     }
 }
