@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::fmt;
 use std::str::FromStr;
 
@@ -10,7 +11,7 @@ use self::constants::*;
 /// no new memory is allocated. Any other chromosome name is stored in the `Other`
 /// variant as a `String`.
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
-pub enum Chrom {
+pub enum Chrom<'a> {
     Chr1,
     Chr2,
     Chr3,
@@ -37,7 +38,13 @@ pub enum Chrom {
     ChrY,
     ChrM,
     /// For chromosome names that are not standard (e.g., "chrEBV", custom contigs).
-    Other(String),
+    Other(Cow<'a, str>),
+}
+
+impl<'a> From<&str> for Chrom<'a> {
+    fn from(value: &str) -> Self {
+        Self::from_str(value).unwrap()
+    }
 }
 
 /// Allows `Chrom` to be formatted into a string using `format!`, `println!`, or `.to_string()`.
@@ -51,7 +58,7 @@ pub enum Chrom {
 /// let other_chrom = Chrom::Other("chrEBV".to_string());
 /// assert_eq!(other_chrom.to_string(), "chrEBV");
 /// ```
-impl fmt::Display for Chrom {
+impl<'a> fmt::Display for Chrom<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.as_str())
     }
@@ -71,7 +78,7 @@ impl fmt::Display for Chrom {
 /// let other: Chrom = "random_contig".parse().unwrap();
 /// assert_eq!(other, Chrom::Other("random_contig".to_string()));
 /// ```
-impl FromStr for Chrom {
+impl<'a> FromStr for Chrom<'a> {
     type Err = std::convert::Infallible;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -101,15 +108,15 @@ impl FromStr for Chrom {
             CHRX => Chrom::ChrX,
             CHRY => Chrom::ChrY,
             CHRM => Chrom::ChrM,
-            oth => Chrom::Other(oth.to_string()),
+            oth => Chrom::Other(oth.to_string().into()),
         };
 
         Ok(r)
     }
 }
 
-impl Chrom {
-    pub fn typical_chroms() -> [Chrom; 24] {
+impl<'a> Chrom<'a> {
+    pub fn typical_chroms() -> [Chrom<'static>; 24] {
         const TYPICAL_CHROMS: [Chrom; 24] = [
             Chrom::Chr1,
             Chrom::Chr2,
@@ -171,7 +178,7 @@ impl Chrom {
             Chrom::ChrX => CHRX,
             Chrom::ChrY => CHRY,
             Chrom::ChrM => CHRM,
-            Chrom::Other(s) => s.as_str(),
+            Chrom::Other(s) => &*s,
         }
     }
 }
@@ -227,14 +234,14 @@ mod tests {
 
         // Test a non-standard chromosome
         let other: Chrom = "chrEBV".parse().unwrap();
-        assert_eq!(other, Chrom::Other("chrEBV".to_string()));
+        assert_eq!(other, Chrom::Other("chrEBV".to_string().into()));
     }
 
     #[test]
     fn test_as_str_and_display() {
         // Test as_str
         assert_eq!(Chrom::Chr22.as_str(), "chr22");
-        let other_chrom = Chrom::Other("my_contig".to_string());
+        let other_chrom = Chrom::Other("my_contig".to_string().into());
         assert_eq!(other_chrom.as_str(), "my_contig");
 
         // Test Display trait (.to_string())

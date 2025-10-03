@@ -75,7 +75,7 @@ mod tests {
         assert_eq!(batches[0].len(), 1);
         assert_eq!(batches[0][0].start, 10);
         assert_eq!(batches[0][0].end, 50);
-        assert_eq!(batches[0][0].contig, "chr1"); // Direct string comparison works for Cow
+        assert_eq!(batches[0][0].contig, "chr1".into()); // Direct string comparison works for Cow
     }
 
     #[test]
@@ -200,19 +200,19 @@ mod tests {
 
         // Batch 1: chr1 regions
         assert_eq!(batches[0].len(), 2);
-        assert_eq!(batches[0][0].contig, "chr1");
+        assert_eq!(batches[0][0].contig, "chr1".into());
         assert_eq!(batches[0][0].start, 10);
         assert_eq!(batches[0][1].end, 30);
 
         // Batch 2: chr2 regions
         assert_eq!(batches[1].len(), 2);
-        assert_eq!(batches[1][0].contig, "chr2");
+        assert_eq!(batches[1][0].contig, "chr2".into());
         assert_eq!(batches[1][0].start, 0);
         assert_eq!(batches[1][1].end, 20);
 
         // Batch 3: chr3 regions
         assert_eq!(batches[2].len(), 1);
-        assert_eq!(batches[2][0].contig, "chr3");
+        assert_eq!(batches[2][0].contig, "chr3".into());
         assert_eq!(batches[2][0].start, 50);
         assert_eq!(batches[2][0].end, 60);
     }
@@ -230,13 +230,13 @@ mod tests {
 
         // Batch 1: chr1 region
         assert_eq!(batches[0].len(), 1);
-        assert_eq!(batches[0][0].contig, "chr1");
+        assert_eq!(batches[0][0].contig, "chr1".into());
         assert_eq!(batches[0][0].start, 10);
         assert_eq!(batches[0][0].end, 20);
 
         // Batch 2: chr2 region
         assert_eq!(batches[1].len(), 1);
-        assert_eq!(batches[1][0].contig, "chr2");
+        assert_eq!(batches[1][0].contig, "chr2".into());
         assert_eq!(batches[1][0].start, 15);
         assert_eq!(batches[1][0].end, 25);
     }

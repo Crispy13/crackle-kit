@@ -2,20 +2,18 @@ use std::str::FromStr;
 
 use anyhow::{Context, Error, anyhow};
 
-use crate::data::chrom::Chrom;
+use crate::data::{chrom::Chrom, region::GenomeRegion};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct Variant {
-    chrom: Chrom,
+pub struct Variant<'a> {
+    chrom: Chrom<'a>,
     pos: i64,
     ref_b: String,
     alt_b: String,
 }
 
-impl FromStr for Variant {
-    type Err = Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+impl<'a> Variant<'a> {
+    fn from_str_key(s: &'a str) -> Result<Self, Error> {
         fn parse_internal(s: &str) -> Result<Variant, Error> {
             let mut elem_iter = s.split("_");
 
@@ -45,7 +43,18 @@ impl FromStr for Variant {
             })
         }
 
-        parse_internal(s).with_context(|| s.to_string())
+        match parse_internal(s) {
+            Ok(v) => Ok(v),
+            Err(err) => Err(anyhow!("{err} Input variant key: {s}")),
+        }
+    }
+
+    fn get_1bp_region(&self) -> GenomeRegion<'_> {
+        GenomeRegion {
+            contig: self.chrom.clone(),
+            start: self.pos,
+            end: self.pos + 1,
+        }
     }
 }
 
@@ -60,7 +69,7 @@ mod tests {
         let a = "chrX_12341_AA_GG";
 
         assert_eq!(
-            Variant::from_str(a)?,
+            Variant::from_str_key(a)?,
             Variant {
                 chrom: Chrom::ChrX,
                 pos: 12341,
@@ -72,7 +81,7 @@ mod tests {
         let a = "chr1_1234111_ACA_TGG";
 
         assert_eq!(
-            Variant::from_str(a)?,
+            Variant::from_str_key(a)?,
             Variant {
                 chrom: Chrom::Chr1,
                 pos: 1234111,
@@ -89,7 +98,7 @@ mod tests {
     fn test_parse_string_invalid1() {
         let a = "chrX_12341_AA_GG_";
 
-        Variant::from_str(a).unwrap();
+        Variant::from_str_key(a).unwrap();
     }
 
     #[test]
@@ -97,7 +106,7 @@ mod tests {
     fn test_parse_string_invalid2() {
         let a = "_chrX_12341_AA_GG";
 
-        Variant::from_str(a).unwrap();
+        Variant::from_str_key(a).unwrap();
     }
 
     #[test]
@@ -105,6 +114,6 @@ mod tests {
     fn test_parse_string_invalid3() {
         let a = "chrX_12341_AA";
 
-        Variant::from_str(a).unwrap();
+        Variant::from_str_key(a).unwrap();
     }
 }

@@ -32,10 +32,10 @@ mod fasta {
     use anyhow::Error;
     use bio::io::fasta::IndexedReader;
 
-    pub fn make_bins_from_fasta(
+    pub fn make_bins_from_fasta<'a>(
         fasta_file: impl AsRef<Path>,
         bin_size: usize,
-    ) -> Result<HashMap<Chrom, Vec<(usize, usize)>>, Error> {
+    ) -> Result<HashMap<Chrom<'a>, Vec<(usize, usize)>>, Error> {
         let ir = IndexedReader::from_file(&fasta_file.as_ref())?;
 
         let mut res = HashMap::with_capacity(ir.index.sequences().len());
