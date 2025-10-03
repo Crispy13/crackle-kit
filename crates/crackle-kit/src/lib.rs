@@ -12,4 +12,5 @@ mod pbar;
 mod nuc_base_map;
 mod utils;
 
-mod data;
+pub mod data;
+pub mod bam;
