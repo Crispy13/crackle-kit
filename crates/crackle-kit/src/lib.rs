@@ -13,4 +13,6 @@ mod nuc_base_map;
 mod utils;
 
 pub mod data;
+
+#[cfg(feature="bam")]
 pub mod bam;

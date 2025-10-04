@@ -5,7 +5,10 @@ use crate::data::chrom::Chrom;
 #[derive(Debug, PartialEq, Eq)]
 pub struct GenomeRegion<'a> {
     pub contig: Chrom<'a>,
+
+    /// 1-based position.
     pub start: i64,
+    /// 1-based position.
     pub end: i64,
 }
 
