@@ -99,14 +99,14 @@ fn batch_input_by_region<'a, I: BamLocusWorkInput<'a>>(
 ///
 ///
 /// ```
-struct ParallelLocusProcessor<W: for<'a> BamLocusWorker<'a>> {
+pub struct ParallelLocusProcessor<W: for<'a> BamLocusWorker<'a>> {
     bam_locus_worker: W,
     n_threads: usize,
     bam_path: PathBuf,
 }
 
 impl<W: for<'a> BamLocusWorker<'a>> ParallelLocusProcessor<W> {
-    fn process_with_batch<'a>(
+    pub fn process_with_batch<'a>(
         &self,
         inputs: Vec<<W as BamLocusWorker<'a>>::Input>,
         batch_window_size: usize,
