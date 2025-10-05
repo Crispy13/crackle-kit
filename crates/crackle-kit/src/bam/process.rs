@@ -9,7 +9,11 @@
 //!
 //!
 
-use std::{collections::{HashMap, HashSet}, i32, path::PathBuf};
+use std::{
+    collections::{HashMap, HashSet},
+    i32,
+    path::PathBuf,
+};
 
 use anyhow::Error;
 use rayon::{
@@ -106,6 +110,14 @@ pub struct ParallelLocusProcessor<W: for<'a> BamLocusWorker<'a>> {
 }
 
 impl<W: for<'a> BamLocusWorker<'a>> ParallelLocusProcessor<W> {
+    pub fn new(bam_locus_worker: W, n_threads: usize, bam_path: PathBuf) -> Self {
+        Self {
+            bam_locus_worker,
+            n_threads,
+            bam_path,
+        }
+    }
+
     pub fn process_with_batch<'a>(
         &self,
         inputs: Vec<<W as BamLocusWorker<'a>>::Input>,
@@ -148,9 +160,10 @@ impl<W: for<'a> BamLocusWorker<'a>> ParallelLocusProcessor<W> {
                         ignore_overlaps: true,
                     });
 
-                    let mut target_pos_map = batch.into_iter().map(|g| {
-                        (g.genome_region().start - 1, g)
-                    }).collect::<HashMap<_, _>>();
+                    let mut target_pos_map = batch
+                        .into_iter()
+                        .map(|g| (g.genome_region().start - 1, g))
+                        .collect::<HashMap<_, _>>();
 
                     let mut res = Vec::with_capacity(target_pos_map.len());
 
@@ -158,12 +171,8 @@ impl<W: for<'a> BamLocusWorker<'a>> ParallelLocusProcessor<W> {
                         let plp = plp_r?;
 
                         let inp = match target_pos_map.remove(&(plp.pos() as i64)) {
-                            Some(b) => {
-                                b
-                            },
-                            None => {
-                                continue
-                            },
+                            Some(b) => b,
+                            None => continue,
                         };
 
                         let r = self.bam_locus_worker.work_for_locus(plp, inp);
