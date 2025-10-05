@@ -28,11 +28,13 @@ use tracing::{Level, event};
 
 use crate::{data::region::GenomeRegion, utils::batch_region::batch_region};
 
-pub trait BamLocusWorker<'a>: Send + Sync {
-    type Output: Send + Sync;
+pub trait BamLocusWorker<'a>: Send + Sync 
+{
     type Input: BamLocusWorkInput<'a>;
+    type Output: Send + Sync;
+    type Error: Into<Error>;
 
-    fn work_for_locus(&self, plp: Pileup, input: Self::Input) -> Self::Output;
+    fn work_for_locus(&self, plp: Pileup, input: Self::Input) -> Result<Self::Output, Self::Error>;
 }
 
 pub trait BamLocusWorkInput<'a>: Send + Sync {
@@ -175,7 +177,10 @@ impl<W: for<'a> BamLocusWorker<'a>> ParallelLocusProcessor<W> {
                             None => continue,
                         };
 
-                        let r = self.bam_locus_worker.work_for_locus(plp, inp);
+                        let r = self
+                            .bam_locus_worker
+                            .work_for_locus(plp, inp)
+                            .map_err(|err| err.into())?;
 
                         res.push(r);
 
@@ -212,8 +217,13 @@ mod tests {
     impl<'a> BamLocusWorker<'a> for MeanBPWorker {
         type Output = f64;
         type Input = GenomeRegion<'a>;
+        type Error = Error;
 
-        fn work_for_locus(&self, plp: Pileup, inp: Self::Input) -> Self::Output {
+        fn work_for_locus(
+            &self,
+            plp: Pileup,
+            inp: Self::Input,
+        ) -> Result<Self::Output, Self::Error> {
             let mut bq_sum: u64 = 0;
             let alignments = plp.alignments();
             let len = alignments.len();
@@ -229,7 +239,7 @@ mod tests {
                 bq_sum += *bq as u64;
             }
 
-            bq_sum as f64 / len as f64
+            Ok(bq_sum as f64 / len as f64)
         }
     }
 
