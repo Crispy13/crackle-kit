@@ -18,9 +18,18 @@ rust-htslib = { git = "https://github.com/Crispy13/rust-htslib", branch = "dev",
 bio = { version = "3.0.0", optional = true }
 rayon = { version = "1.11.0", optional = true }
 
+[dev-dependencies]
+criterion = { workspace = true }
+rand = "0.9.2"
+
 [features]
 memfd = ["dep:nix"]
 fastq = ["dep:flate2"]
 htslib = ["dep:rust-htslib"]
 bio = ["dep:bio"]
 bam = ["dep:rust-htslib", "rust-htslib/libdeflate", "dep:rayon"]
+
+
+[[bench]]
+name = "bench1"
+harness = false

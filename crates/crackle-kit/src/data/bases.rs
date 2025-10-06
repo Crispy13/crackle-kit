@@ -1,4 +1,4 @@
-use std::ops::Index;
+use std::ops::{Index, Range, RangeFrom, RangeFull, RangeTo};
 
 use anyhow::{Error, anyhow};
 
@@ -19,7 +19,20 @@ const C_CODE: u64 = 0b011;
 const G_CODE: u64 = 0b100;
 const N_CODE: u64 = 0b101;
 
-#[derive(Debug, PartialEq, Eq)]
+// --- Compile-time Lookup Table for performance ---
+const fn build_lookup_table() -> [u8; 256] {
+    let mut table = [0xFF; 256]; // 0xFF is our error sentinel
+    table[b'A' as usize] = A_CODE as u8;
+    table[b'T' as usize] = T_CODE as u8;
+    table[b'C' as usize] = C_CODE as u8;
+    table[b'G' as usize] = G_CODE as u8;
+    table[b'N' as usize] = N_CODE as u8;
+    table
+}
+
+const LOOKUP_TABLE: [u8; 256] = build_lookup_table();
+
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct BaseArr {
     inner: [u64; BASE_ARR_LEN],
 }
@@ -39,7 +52,7 @@ impl std::fmt::Display for BaseArr {
                     G_CODE => 'G',
                     N_CODE => 'N',
                     NULL_CODE => break 'outer, // Found the end of the sequence
-                    _ => unreachable!(),    // Should not happen with 3-bit encoding
+                    _ => unreachable!(),       // Should not happen with 3-bit encoding
                 };
                 write!(f, "{}", base_char)?;
             }
@@ -48,11 +61,125 @@ impl std::fmt::Display for BaseArr {
     }
 }
 
+pub trait BaseArrIndex {
+    type Output;
+    fn get(self, arr: &BaseArr) -> Option<Self::Output>;
+}
+
+impl BaseArrIndex for usize {
+    type Output = Base;
+
+    fn get(self, arr: &BaseArr) -> Option<Self::Output> {
+        let (idx, offset) = (self / n_bases_in_chunk!(), self % n_bases_in_chunk!());
+
+        // Bounds check
+        if idx >= arr.inner.len() {
+            return None;
+        }
+
+        let code = (arr.inner[idx] >> (offset * 3)) & 0b111; // Mask to get only the 3 bits
+
+        BaseArr::CODE_LOOKUP_TABLE[code as usize]
+
+        // match code {
+        //     A_CODE => Some(Base::A),
+        //     T_CODE => Some(Base::T),
+        //     C_CODE => Some(Base::C),
+        //     G_CODE => Some(Base::G),
+        //     N_CODE => Some(Base::N),
+        //     // NULL_CODE (0) and any other invalid codes will correctly return None.
+        //     _ => None,
+        // }
+    }
+}
+
+/// An optimized iterator over the bases in a `BaseArr`.
+/// It works chunk-by-chunk to avoid expensive division and modulo in the loop.
+pub struct BaseArrIter<'a> {
+    arr: &'a BaseArr,
+    chunk_index: usize,
+    offset_in_chunk: usize,
+    total_index: usize,
+    end_index: usize,
+}
+
+impl<'a> Iterator for BaseArrIter<'a> {
+    type Item = Base;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.total_index >= self.end_index {
+            return None;
+        }
+
+        if self.offset_in_chunk >= n_bases_in_chunk!() {
+            self.chunk_index += 1;
+            self.offset_in_chunk = 0;
+        }
+
+        if self.chunk_index >= BASE_ARR_LEN {
+            return None;
+        }
+
+        let chunk = self.arr.inner[self.chunk_index];
+        let code = (chunk >> (self.offset_in_chunk * 3)) & 0b111;
+
+        self.offset_in_chunk += 1;
+        self.total_index += 1;
+
+        match BaseArr::CODE_LOOKUP_TABLE[code as usize] {
+            Some(b) => Some(b),
+            None => {
+                self.end_index = 0;
+                None
+            }
+        }
+
+        // match code {
+        //     A_CODE => Some(Base::A),
+        //     T_CODE => Some(Base::T),
+        //     C_CODE => Some(Base::C),
+        //     G_CODE => Some(Base::G),
+        //     N_CODE => Some(Base::N),
+        //     NULL_CODE => {
+        //         // Stop the iterator permanently if we hit a null terminator
+        //         self.end_index = 0;
+        //         None
+        //     }
+        //     _ => unreachable!(),
+        // }
+    }
+}
 
 impl BaseArr {
+    const CODE_LOOKUP_TABLE: [Option<Base>; 6] = {
+        let mut arr = [None; 6];
+
+        arr[A_CODE as usize] = Some(Base::A);
+        arr[T_CODE as usize] = Some(Base::T);
+        arr[C_CODE as usize] = Some(Base::C);
+        arr[G_CODE as usize] = Some(Base::G);
+        arr[N_CODE as usize] = Some(Base::N);
+        // arr[NULL_CODE as usize] = None;
+
+        arr
+    };
+
+    const BASE_TO_CODE_TABLE: [u64; 8] = {
+        let mut arr = [0; 8];
+
+        arr[Base::A as usize] = A_CODE;
+        arr[Base::T as usize] = T_CODE;
+        arr[Base::C as usize] = C_CODE;
+        arr[Base::G as usize] = G_CODE;
+        arr[Base::N as usize] = N_CODE;
+        // arr[NULL_CODE as usize] = None;
+
+        arr
+    };
+
     /// Creates a new BaseArr from a slice of bytes (e.g., b"ACGTN...").
     /// Returns an error if the slice is too long to fit.
-    pub fn from_bytes(s: &[u8]) -> Result<Self, Error> {
+    pub fn from_bytes1(s: &[u8]) -> Result<Self, Error> {
         let mut inner = [0u64; BASE_ARR_LEN];
 
         if s.len() > BASE_ARR_LEN * n_bases_in_chunk!() {
@@ -86,25 +213,63 @@ impl BaseArr {
         Ok(BaseArr { inner })
     }
 
-    /// Gets the Base at a given index.
-    pub fn get(&self, index: usize) -> Option<Base> {
-        let (idx, offset) = (index / n_bases_in_chunk!(), index % n_bases_in_chunk!());
-
-        // Bounds check
-        if idx >= self.inner.len() {
-            return None;
+    /// Creates a new BaseArr from a slice of bytes using a fast, chunk-based approach.
+    pub fn from_bytes(s: &[u8]) -> Result<Self, Error> {
+        let max_len = BASE_ARR_LEN * n_bases_in_chunk!();
+        if s.len() > max_len {
+            return Err(anyhow!(
+                "Input slice is too long: {} bases, max is {}",
+                s.len(),
+                max_len
+            ));
         }
 
-        let code = (self.inner[idx] >> (offset * 3)) & 0b111; // Mask to get only the 3 bits
+        let mut inner = [0u64; BASE_ARR_LEN];
 
-        match code {
-            A_CODE => Some(Base::A),
-            T_CODE => Some(Base::T),
-            C_CODE => Some(Base::C),
-            G_CODE => Some(Base::G),
-            N_CODE => Some(Base::N),
-            // NULL_CODE (0) and any other invalid codes will correctly return None.
-            _ => None,
+        // Process full chunks of 21 bytes for maximum efficiency
+        for (chunk_idx, chunk) in s.chunks(n_bases_in_chunk!()).enumerate() {
+            let mut current_u64 = 0u64;
+            for (offset, &byte) in chunk.iter().enumerate() {
+                // Use the fast lookup table instead of a match statement
+                let code = LOOKUP_TABLE[byte as usize];
+                if code == 0xFF {
+                    let global_idx = chunk_idx * n_bases_in_chunk!() + offset;
+                    return Err(anyhow!(
+                        "Invalid base '{}' at position {}",
+                        byte as char,
+                        global_idx
+                    ));
+                }
+                current_u64 |= (code as u64) << (offset * 3);
+            }
+            inner[chunk_idx] = current_u64;
+        }
+
+        Ok(BaseArr { inner })
+    }
+
+    /// Gets the Base at a given index.
+    pub fn get<I: BaseArrIndex>(&self, index: I) -> Option<I::Output> {
+        index.get(self)
+    }
+
+    /// Returns an optimized iterator for a given range.
+    /// This is now generic and accepts `start..end`, `start..`, `..end`, and `..`.
+    pub fn get_iter<'a, R>(&'a self, range: R) -> BaseArrIter<'a>
+    where
+        R: BaseArrRange<'a>,
+    {
+        range.get_iter(self)
+    }
+
+    /// Returns an iterator over all the bases in the sequence.
+    pub fn iter(&self) -> BaseArrIter<'_> {
+        BaseArrIter {
+            arr: self,
+            chunk_index: 0,
+            offset_in_chunk: 0,
+            total_index: 0,
+            end_index: BASE_ARR_LEN * n_bases_in_chunk!(),
         }
     }
 
@@ -124,18 +289,75 @@ impl BaseArr {
         let clear_mask = !(0b111 << bit_pos);
         self.inner[idx] &= clear_mask;
 
-        // 2. Convert the new Base to its 3-bit code.
-        let new_code = match new_base {
-            Base::A => A_CODE,
-            Base::T => T_CODE,
-            Base::C => C_CODE,
-            Base::G => G_CODE,
-            Base::N => N_CODE,
-        };
+        let new_code = Self::BASE_TO_CODE_TABLE[new_base as usize];
+
+        // // 2. Convert the new Base to its 3-bit code.
+        // let new_code = match new_base {
+        //     Base::A => A_CODE,
+        //     Base::T => T_CODE,
+        //     Base::C => C_CODE,
+        //     Base::G => G_CODE,
+        //     Base::N => N_CODE,
+        // };
 
         // 3. Shift the new code to the correct position and use bitwise OR
         //    to set the new bits.
         self.inner[idx] |= new_code << bit_pos;
+    }
+}
+
+/// A trait for types that can be used to create an iterator over a `BaseArr`.
+pub trait BaseArrRange<'a> {
+    fn get_iter(self, arr: &'a BaseArr) -> BaseArrIter<'a>;
+}
+
+impl<'a> BaseArrRange<'a> for Range<usize> {
+    fn get_iter(self, arr: &'a BaseArr) -> BaseArrIter<'a> {
+        let start = self.start;
+        let end = self.end;
+        let start_chunk = start / n_bases_in_chunk!();
+        let start_offset = start % n_bases_in_chunk!();
+        BaseArrIter {
+            arr,
+            chunk_index: start_chunk,
+            offset_in_chunk: start_offset,
+            total_index: start,
+            end_index: end.min(BASE_ARR_LEN * n_bases_in_chunk!()),
+        }
+    }
+}
+
+impl<'a> BaseArrRange<'a> for RangeFrom<usize> {
+    fn get_iter(self, arr: &'a BaseArr) -> BaseArrIter<'a> {
+        let start = self.start;
+        let end = BASE_ARR_LEN * n_bases_in_chunk!();
+        let start_chunk = start / n_bases_in_chunk!();
+        let start_offset = start % n_bases_in_chunk!();
+        BaseArrIter {
+            arr,
+            chunk_index: start_chunk,
+            offset_in_chunk: start_offset,
+            total_index: start,
+            end_index: end,
+        }
+    }
+}
+
+impl<'a> BaseArrRange<'a> for RangeTo<usize> {
+    fn get_iter(self, arr: &'a BaseArr) -> BaseArrIter<'a> {
+        BaseArrIter {
+            arr,
+            chunk_index: 0,
+            offset_in_chunk: 0,
+            total_index: 0,
+            end_index: self.end.min(BASE_ARR_LEN * n_bases_in_chunk!()),
+        }
+    }
+}
+
+impl<'a> BaseArrRange<'a> for RangeFull {
+    fn get_iter(self, arr: &'a BaseArr) -> BaseArrIter<'a> {
+        arr.iter()
     }
 }
 
@@ -149,17 +371,45 @@ pub enum Base {
     N,
 }
 
+impl Base {
+    const BYTE_TO_BASE_TABLE: [Option<Self>; 256] = {
+        {
+            let mut table = [None; 256]; // 0xFF is our error sentinel
+            table[b'A' as usize] = Some(Self::A);
+            table[b'T' as usize] = Some(Self::T);
+            table[b'C' as usize] = Some(Self::C);
+            table[b'G' as usize] = Some(Self::G);
+            table[b'N' as usize] = Some(Self::N);
+            table
+        }
+    };
+
+    // const STRING_LOOKUP_STABLE: [std::string::String; 256] = {
+    //     let mut table = [const { String::new() }; 256];
+        
+    //     table[Self::A as usize].push_str("A");
+    // }
+}
+
 impl TryFrom<u8> for Base {
     type Error = Error;
 
+    // fn try_from(value: u8) -> Result<Self, Self::Error> {
+    //     let r = match value {
+    //         b'A' => Self::A,
+    //         b'C' => Self::C,
+    //         b'T' => Self::T,
+    //         b'G' => Self::G,
+    //         b'N' => Self::N,
+    //         oth => Err(anyhow!("Invalid base: {}", oth as char))?,
+    //     };
+
+    //     Ok(r)
+    // }
     fn try_from(value: u8) -> Result<Self, Self::Error> {
-        let r = match value {
-            b'A' => Self::A,
-            b'C' => Self::C,
-            b'T' => Self::T,
-            b'G' => Self::G,
-            b'N' => Self::N,
-            oth => Err(anyhow!("Invalid base: {}", oth as char))?,
+        let r = match Self::BYTE_TO_BASE_TABLE[value as usize] {
+            Some(b) => b,
+            None => Err(anyhow!("Invalid base: {}", value as char))?,
         };
 
         Ok(r)
@@ -308,5 +558,42 @@ mod tests {
 
         Ok(())
     }
-}
 
+    #[test]
+    fn test_get_iter() -> Result<(), Error> {
+        let seq = b"ATCGNATCGN"; // 10 bases
+        let arr = BaseArr::from_bytes(seq)?;
+
+        // Test a sub-slice (Range)
+        let sub: Vec<Base> = arr.get_iter(2..6).collect();
+        assert_eq!(sub, vec![Base::C, Base::G, Base::N, Base::A]);
+
+        // Test a slice that goes to the end (RangeFrom)
+        let sub_to_end: Vec<Base> = arr.get_iter(7..).collect();
+        assert_eq!(sub_to_end, vec![Base::C, Base::G, Base::N]);
+
+        // Test a slice from the beginning (RangeTo)
+        let sub_from_start: Vec<Base> = arr.get_iter(..3).collect();
+        assert_eq!(sub_from_start, vec![Base::A, Base::T, Base::C]);
+
+        // Test a full slice (RangeFull)
+        let sub_full: Vec<Base> = arr.get_iter(..).collect();
+        assert_eq!(
+            sub_full,
+            vec![
+                Base::A,
+                Base::T,
+                Base::C,
+                Base::G,
+                Base::N,
+                Base::A,
+                Base::T,
+                Base::C,
+                Base::G,
+                Base::N
+            ]
+        );
+
+        Ok(())
+    }
+}
