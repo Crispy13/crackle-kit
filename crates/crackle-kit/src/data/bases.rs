@@ -58,9 +58,9 @@ impl std::fmt::Display for BaseArr {
                 let code = (chunk >> (i * 3)) & 0b111;
 
                 if code == NULL_CODE {
-                    break 'outer
+                    break 'outer;
                 }
-                
+
                 let base_char = CODE_TO_CHAR_LOOKUP[code as usize];
                 write!(f, "{}", base_char)?;
             }
@@ -87,7 +87,7 @@ impl BaseArrIndex for usize {
 
         let code = (arr.inner[idx] >> (offset * 3)) & 0b111; // Mask to get only the 3 bits
 
-        BaseArr::CODE_LOOKUP_TABLE[code as usize]
+        BaseArr::CODE_TO_BASE_LOOKUP[code as usize]
 
         // match code {
         //     A_CODE => Some(Base::A),
@@ -101,8 +101,7 @@ impl BaseArrIndex for usize {
     }
 }
 
-/// An optimized iterator over the bases in a `BaseArr`.
-/// It works chunk-by-chunk to avoid expensive division and modulo in the loop.
+/// A high-performance iterator that avoids division/modulo in the `next` method.
 pub struct BaseArrIter<'a> {
     arr: &'a BaseArr,
     chunk_index: usize,
@@ -111,9 +110,24 @@ pub struct BaseArrIter<'a> {
     end_index: usize,
 }
 
+impl<'a> BaseArrIter<'a> {
+    /// Creates a new iterator for a given range.
+    fn new(arr: &'a BaseArr, start: usize, end: usize) -> Self {
+        let end = end.min(BASE_ARR_LEN * n_bases_in_chunk!());
+        Self {
+            arr,
+            chunk_index: start / n_bases_in_chunk!(),
+            offset_in_chunk: start % n_bases_in_chunk!(),
+            total_index: start,
+            end_index: end,
+        }
+    }
+}
+
 impl<'a> Iterator for BaseArrIter<'a> {
     type Item = Base;
 
+    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         if self.total_index >= self.end_index {
             return None;
@@ -134,32 +148,17 @@ impl<'a> Iterator for BaseArrIter<'a> {
         self.offset_in_chunk += 1;
         self.total_index += 1;
 
-        match BaseArr::CODE_LOOKUP_TABLE[code as usize] {
-            Some(b) => Some(b),
-            None => {
-                self.end_index = 0;
-                None
-            }
+        let base = BaseArr::CODE_TO_BASE_LOOKUP[code as usize];
+        if base.is_none() {
+            // Found a NULL terminator, stop the iterator permanently.
+            self.end_index = 0;
         }
-
-        // match code {
-        //     A_CODE => Some(Base::A),
-        //     T_CODE => Some(Base::T),
-        //     C_CODE => Some(Base::C),
-        //     G_CODE => Some(Base::G),
-        //     N_CODE => Some(Base::N),
-        //     NULL_CODE => {
-        //         // Stop the iterator permanently if we hit a null terminator
-        //         self.end_index = 0;
-        //         None
-        //     }
-        //     _ => unreachable!(),
-        // }
+        base
     }
 }
 
 impl BaseArr {
-    const CODE_LOOKUP_TABLE: [Option<Base>; 6] = {
+    const CODE_TO_BASE_LOOKUP: [Option<Base>; 6] = {
         let mut arr = [None; 6];
 
         arr[A_CODE as usize] = Some(Base::A);
@@ -272,13 +271,7 @@ impl BaseArr {
 
     /// Returns an iterator over all the bases in the sequence.
     pub fn iter(&self) -> BaseArrIter<'_> {
-        BaseArrIter {
-            arr: self,
-            chunk_index: 0,
-            offset_in_chunk: 0,
-            total_index: 0,
-            end_index: BASE_ARR_LEN * n_bases_in_chunk!(),
-        }
+        BaseArrIter::new(self, 0, BASE_ARR_LEN * n_bases_in_chunk!())
     }
 
     /// Sets the Base at a given index to a new value.
@@ -314,52 +307,27 @@ impl BaseArr {
     }
 }
 
-/// A trait for types that can be used to create an iterator over a `BaseArr`.
+
+/// A trait for range types that can be used to create an iterator over a `BaseArr`.
 pub trait BaseArrRange<'a> {
     fn get_iter(self, arr: &'a BaseArr) -> BaseArrIter<'a>;
 }
 
 impl<'a> BaseArrRange<'a> for Range<usize> {
     fn get_iter(self, arr: &'a BaseArr) -> BaseArrIter<'a> {
-        let start = self.start;
-        let end = self.end;
-        let start_chunk = start / n_bases_in_chunk!();
-        let start_offset = start % n_bases_in_chunk!();
-        BaseArrIter {
-            arr,
-            chunk_index: start_chunk,
-            offset_in_chunk: start_offset,
-            total_index: start,
-            end_index: end.min(BASE_ARR_LEN * n_bases_in_chunk!()),
-        }
+        BaseArrIter::new(arr, self.start, self.end)
     }
 }
 
 impl<'a> BaseArrRange<'a> for RangeFrom<usize> {
     fn get_iter(self, arr: &'a BaseArr) -> BaseArrIter<'a> {
-        let start = self.start;
-        let end = BASE_ARR_LEN * n_bases_in_chunk!();
-        let start_chunk = start / n_bases_in_chunk!();
-        let start_offset = start % n_bases_in_chunk!();
-        BaseArrIter {
-            arr,
-            chunk_index: start_chunk,
-            offset_in_chunk: start_offset,
-            total_index: start,
-            end_index: end,
-        }
+        BaseArrIter::new(arr, self.start, BASE_ARR_LEN * n_bases_in_chunk!())
     }
 }
 
 impl<'a> BaseArrRange<'a> for RangeTo<usize> {
     fn get_iter(self, arr: &'a BaseArr) -> BaseArrIter<'a> {
-        BaseArrIter {
-            arr,
-            chunk_index: 0,
-            offset_in_chunk: 0,
-            total_index: 0,
-            end_index: self.end.min(BASE_ARR_LEN * n_bases_in_chunk!()),
-        }
+        BaseArrIter::new(arr, 0, self.end)
     }
 }
 
@@ -394,7 +362,7 @@ impl Base {
 
     // const STRING_LOOKUP_STABLE: [std::string::String; 256] = {
     //     let mut table = [const { String::new() }; 256];
-        
+
     //     table[Self::A as usize].push_str("A");
     // }
 }
