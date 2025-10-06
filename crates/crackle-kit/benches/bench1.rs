@@ -199,8 +199,8 @@ fn benchmark_storage_and_access(c: &mut Criterion) {
     let bases = [Base::A, Base::T, Base::C, Base::G, Base::N];
     let mutations: Vec<(usize, usize, Base, char)> = (0..1000)
         .map(|_| {
-            let seq_idx = rng.gen_range(0..NUM_SEQS);
-            let base_idx = rng.gen_range(0..SEQ_LEN);
+            let seq_idx = rng.random_range(0..NUM_SEQS);
+            let base_idx = rng.random_range(0..SEQ_LEN);
             let new_base = *bases.choose(&mut rng).unwrap();
             let new_char = match new_base {
                 Base::A => 'A', Base::T => 'T', Base::C => 'C',

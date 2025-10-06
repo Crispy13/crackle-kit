@@ -30,7 +30,18 @@ const fn build_lookup_table() -> [u8; 256] {
     table
 }
 
-const LOOKUP_TABLE: [u8; 256] = build_lookup_table();
+const BYTE_TO_CODE_LOOKUP: [u8; 256] = build_lookup_table();
+
+const CODE_TO_CHAR_LOOKUP: [char; 6] = {
+    let mut arr = [0 as char; 6];
+
+    arr[A_CODE as usize] = 'A';
+    arr[T_CODE as usize] = 'T';
+    arr[C_CODE as usize] = 'C';
+    arr[G_CODE as usize] = 'G';
+    arr[N_CODE as usize] = 'N';
+    arr
+};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct BaseArr {
@@ -45,15 +56,12 @@ impl std::fmt::Display for BaseArr {
         'outer: for chunk in self.inner {
             for i in 0..n_bases_in_chunk!() {
                 let code = (chunk >> (i * 3)) & 0b111;
-                let base_char = match code {
-                    A_CODE => 'A',
-                    T_CODE => 'T',
-                    C_CODE => 'C',
-                    G_CODE => 'G',
-                    N_CODE => 'N',
-                    NULL_CODE => break 'outer, // Found the end of the sequence
-                    _ => unreachable!(),       // Should not happen with 3-bit encoding
-                };
+
+                if code == NULL_CODE {
+                    break 'outer
+                }
+                
+                let base_char = CODE_TO_CHAR_LOOKUP[code as usize];
                 write!(f, "{}", base_char)?;
             }
         }
@@ -231,7 +239,7 @@ impl BaseArr {
             let mut current_u64 = 0u64;
             for (offset, &byte) in chunk.iter().enumerate() {
                 // Use the fast lookup table instead of a match statement
-                let code = LOOKUP_TABLE[byte as usize];
+                let code = BYTE_TO_CODE_LOOKUP[byte as usize];
                 if code == 0xFF {
                     let global_idx = chunk_idx * n_bases_in_chunk!() + offset;
                     return Err(anyhow!(
@@ -593,6 +601,51 @@ mod tests {
                 Base::N
             ]
         );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_long_sequence_operations() -> Result<(), Error> {
+        // Create a long sequence (50 bases) that spans multiple u64 chunks.
+        let mut original_bytes = b"ATCGNATCGNATCGNATCGNATCGNATCGNATCGNATCGNATCGNATCGN".to_vec();
+        assert_eq!(original_bytes.len(), 50);
+
+        let mut arr = BaseArr::from_bytes(&original_bytes)?;
+
+        // 1. Verify `from_bytes` and `get` for the entire long sequence.
+        for i in 0..original_bytes.len() {
+            let expected_base = Base::try_from(original_bytes[i])?;
+            assert_eq!(arr.get(i), Some(expected_base), "Mismatch at index {}", i);
+        }
+
+        // 2. Verify `set` at multiple positions, including across chunk boundaries.
+        // Boundary between chunk 0 and 1 is at index 21.
+        // Boundary between chunk 1 and 2 is at index 42.
+        arr.set(5, Base::T);
+        original_bytes[5] = b'T';
+        arr.set(21, Base::C);
+        original_bytes[21] = b'C';
+        arr.set(45, Base::G);
+        original_bytes[45] = b'G';
+
+        assert_eq!(arr.get(5), Some(Base::T));
+        assert_eq!(arr.get(21), Some(Base::C));
+        assert_eq!(arr.get(45), Some(Base::G));
+        // Verify that a non-modified base is still correct.
+        assert_eq!(arr.get(10), Some(Base::A));
+
+        // 3. Verify `get_iter` over a range spanning chunks.
+        let sub_seq: Vec<Base> = arr.get_iter(20..25).collect();
+        let expected_sub_seq: Vec<Base> = original_bytes[20..25]
+            .iter()
+            .map(|&b| Base::try_from(b).unwrap())
+            .collect();
+        assert_eq!(sub_seq, expected_sub_seq);
+
+        // 4. Verify `to_string` for the modified long sequence.
+        let expected_string = std::str::from_utf8(&original_bytes)?.to_string();
+        assert_eq!(arr.to_string(), expected_string);
 
         Ok(())
     }
