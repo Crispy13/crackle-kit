@@ -6,7 +6,7 @@ use std::{
 };
 
 /// A Arc<String> Wrapper to use it for HashMap, Hashset
-#[derive(PartialEq, Eq, Debug, Hash)]
+#[derive(PartialEq, Eq, Debug, Hash, Clone)]
 pub struct ArcString {
     inner: Arc<String>,
 }
