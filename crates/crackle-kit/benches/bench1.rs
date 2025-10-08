@@ -117,6 +117,18 @@ fn benchmark_storage_and_access(c: &mut Criterion) {
             black_box(base_arr_vec);
         })
     });
+
+    // Benchmark creating a Vec of BaseArr
+    group.bench_function("Vec<BaseArr>_from_iter", |b| {
+        b.iter(|| {
+            let base_arr_vec: Vec<BaseArr> = sequences
+                .iter()
+                .map(|s| BaseArr::from_iter(s.iter().copied()).unwrap())
+                .collect();
+            black_box(base_arr_vec);
+        })
+    });
+
     group.finish();
 
     // --- Pre-build collections for access benchmarks ---
@@ -252,8 +264,8 @@ fn bench_range_access(c: &mut Criterion) {
 }
 
 criterion_group!(
-    benches, 
-    bench_range_access,
-    // benchmark_storage_and_access
+    benches,
+    benchmark_storage_and_access
+    // bench_range_access,
 );
 criterion_main!(benches);

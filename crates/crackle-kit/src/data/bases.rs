@@ -220,6 +220,95 @@ impl BaseArr {
         Ok(BaseArr { inner })
     }
 
+    pub fn from_iter2(iter: impl IntoIterator<Item = u8>) -> Result<Self, Error> {
+        let mut inner = [0u64; BASE_ARR_LEN];
+
+        let mut iter_into = iter.into_iter();
+        let mut chunk_idx = 0;
+        loop {
+            let iter_br = iter_into.by_ref().take(n_bases_in_chunk!());
+
+            let mut current_u64 = 0u64;
+            let mut end_reached = false;
+            for (offset, byte) in iter_br.enumerate() {
+                // offset = i * 3;
+
+                let code = BYTE_TO_CODE_LOOKUP[byte as usize];
+
+                if code == 0xFF {
+                    let global_idx = chunk_idx * n_bases_in_chunk!() + offset;
+                    return Err(anyhow!(
+                        "Invalid base '{}' at position {}",
+                        byte as char,
+                        global_idx
+                    ));
+                }
+
+                current_u64 |= (code as u64) << (offset * 3);
+
+                if offset == n_bases_in_chunk!() - 1 {
+                    end_reached = true;
+                }
+            }
+
+            inner[chunk_idx] = current_u64;
+
+            chunk_idx += 1;
+
+        //     let code_of_last = current_u64 >> ((n_bases_in_chunk!() - 1) * 3) & 0b111;
+        //     // eprintln!("code_of_last={}", code_of_last);
+        //     if code_of_last == NULL_CODE {
+        //         break;
+        //     }
+
+            if !end_reached {
+                break;
+            }
+        }
+            
+
+        Ok(Self { inner })
+    }
+
+    /// Creates a new `BaseArr` from any iterator of bytes.
+    pub fn from_iter(iter: impl IntoIterator<Item = u8>) -> Result<Self, Error> {
+        let mut inner = [0u64; BASE_ARR_LEN];
+        let mut iter = iter.into_iter().peekable();
+
+        for chunk_idx in 0..BASE_ARR_LEN {
+            if iter.peek().is_none() {
+                break; // Stop if the iterator is empty
+            }
+
+            let mut current_u64 = 0u64;
+            for i in 0..n_bases_in_chunk!() {
+                if let Some(byte) = iter.next() {
+                    let code = BYTE_TO_CODE_LOOKUP[byte as usize];
+                    if code == 0xFF {
+                        let global_idx = chunk_idx * n_bases_in_chunk!() + i;
+                        return Err(anyhow!(
+                            "Invalid base '{}' at position {}",
+                            byte as char,
+                            global_idx
+                        ));
+                    }
+                    current_u64 |= (code as u64) << (i * 3);
+                } else {
+                    break; // Stop if the chunk is not full
+                }
+            }
+            inner[chunk_idx] = current_u64;
+        }
+
+        // Check if there is still data left in the iterator, which means it's too long.
+        if iter.peek().is_some() {
+            let max_len = BASE_ARR_LEN * n_bases_in_chunk!();
+            return Err(anyhow!("Input iterator is too long, max is {}", max_len));
+        }
+
+        Ok(BaseArr { inner })
+    }
+
     /// Creates a new BaseArr from a slice of bytes using a fast, chunk-based approach.
     pub fn from_bytes(s: &[u8]) -> Result<Self, Error> {
         let max_len = BASE_ARR_LEN * n_bases_in_chunk!();
@@ -306,7 +395,6 @@ impl BaseArr {
         self.inner[idx] |= new_code << bit_pos;
     }
 }
-
 
 /// A trait for range types that can be used to create an iterator over a `BaseArr`.
 pub trait BaseArrRange<'a> {
@@ -616,5 +704,57 @@ mod tests {
         assert_eq!(arr.to_string(), expected_string);
 
         Ok(())
+    }
+
+    #[test]
+    fn test_from_iter_simple() -> Result<(), Error> {
+        let seq = vec![b'A', b'T', b'C', b'G', b'N'];
+        let arr = BaseArr::from_iter(seq)?;
+        assert_eq!(arr.to_string(), "ATCGN");
+        Ok(())
+    }
+
+    #[test]
+    fn test_from_iter_empty() -> Result<(), Error> {
+        let seq: Vec<u8> = vec![];
+        let arr = BaseArr::from_iter(seq)?;
+        assert_eq!(arr.to_string(), "");
+        Ok(())
+    }
+
+    #[test]
+    fn test_from_iter_spans_chunks() -> Result<(), Error> {
+        let seq = "ATCGNATCGNATCGNATCGNATCGN".bytes().collect::<Vec<u8>>(); // 25 bases
+        let arr = BaseArr::from_iter(seq)?;
+        assert_eq!(arr.to_string(), "ATCGNATCGNATCGNATCGNATCGN");
+        assert_eq!(arr.get(20), Some(Base::A));
+        assert_eq!(arr.get(21), Some(Base::T));
+        Ok(())
+    }
+
+    #[test]
+    fn test_from_iter_invalid_char() {
+        let seq = "ATCGZ".bytes().collect::<Vec<u8>>();
+        let result = BaseArr::from_iter(seq);
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Invalid base 'Z' at position 4")
+        );
+    }
+
+    #[test]
+    fn test_from_iter_too_long() {
+        let seq = vec![b'A'; 200];
+        let result = BaseArr::from_iter(seq);
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Input iterator is too long")
+        );
     }
 }
