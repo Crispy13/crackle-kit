@@ -1,7 +1,7 @@
 use std::hint::black_box;
 
 // IMPORTANT: Replace `crackle_kit` with the actual name of your crate.
-use crackle_kit::data::bases::{Base, BaseArr};
+use crackle_kit::data::bases::{Base, BaseArr as BA};
 use criterion::{Criterion, criterion_group, criterion_main};
 use rand::SeedableRng;
 use rand::prelude::*;
@@ -10,6 +10,8 @@ use rand::rngs::StdRng;
 // --- Setup ---
 const NUM_SEQS: usize = 1000;
 const SEQ_LEN: usize = 150;
+
+type BaseArr = BA<u64>;
 
 /// Generates a vector of random DNA sequences using a seeded RNG for reproducibility.
 fn generate_sequences(num_seqs: usize, seq_len: usize) -> Vec<Vec<u8>> {
@@ -260,12 +262,27 @@ fn bench_range_access(c: &mut Criterion) {
             }
         })
     });
+
+    // even slower than the above function.
+    // group.bench_function("Vec<BaseArr>_get", |b| {
+    //     b.iter(|| {
+    //         for &(seq_idx, ref range) in &access_ranges {
+    //             // get_iter returns an iterator that we consume
+
+    //             let target_seq = &base_arr_vec[seq_idx];
+
+    //             for i in range.clone() {
+    //                 black_box(target_seq.get(i).unwrap());
+    //             }
+    //         }
+    //     })
+    // });
     group.finish();
 }
 
 criterion_group!(
     benches,
-    benchmark_storage_and_access
-    // bench_range_access,
+    // benchmark_storage_and_access,
+    bench_range_access,
 );
 criterion_main!(benches);
