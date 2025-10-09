@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use anyhow::{Context, Error, anyhow};
 
-use crate::data::{chrom::Chrom, region::GenomeRegion};
+use crate::data::{chrom::Chrom, locus::GenomeRegion};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Variant<'a> {

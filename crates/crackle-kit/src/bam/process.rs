@@ -9,10 +9,24 @@
 //!
 //!
 
+/*
+251009 TODO: Refactor ParallelLocusProcessor for Correctness and Performance
+The current implementation has a critical bug: the HashMap logic only checks the start coordinate of a region. This must be replaced to correctly handle all sites.
+
+The plan is to enforce a 1-bp site constraint and replace the core algorithm with a "merge/zip" (sweep-line) approach.
+
+Algorithm:
+Inside the rayon::map closure, process the sorted pileup iterator and the sorted batch of inputs in a single pass. Use peekable() on both iterators and match on the cmp() result of their positions to handle the three cases:
+
+pileup < site: Advance the pileup iterator.
+
+pileup > site: Advance the site iterator.
+
+pileup == site: Process the match and advance both iterators.
+*/
+
 use std::{
-    collections::{HashMap, HashSet},
-    i32,
-    path::PathBuf,
+    cmp::Ordering, collections::{HashMap, HashSet}, i32, path::PathBuf
 };
 
 use anyhow::Error;
@@ -26,10 +40,12 @@ use rust_htslib::bam::{
 };
 use tracing::{Level, event};
 
-use crate::{data::region::GenomeRegion, utils::batch_region::batch_region};
+use crate::{
+    data::locus::{GenomeCoordinate, GenomeRegion},
+    utils::batch_region::batch_region,
+};
 
-pub trait BamLocusWorker<'a>: Send + Sync 
-{
+pub trait BamLocusWorker<'a>: Send + Sync {
     type Input: BamLocusWorkInput<'a>;
     type Output: Send + Sync;
     type Error: Into<Error>;
@@ -38,16 +54,16 @@ pub trait BamLocusWorker<'a>: Send + Sync
 }
 
 pub trait BamLocusWorkInput<'a>: Send + Sync {
-    fn genome_region(&self) -> &GenomeRegion<'a>;
+    fn genome_coordinate(&self) -> &GenomeCoordinate<'a>;
 }
 
-impl<'a> BamLocusWorkInput<'a> for GenomeRegion<'a> {
-    fn genome_region(&self) -> &GenomeRegion<'a> {
+impl<'a> BamLocusWorkInput<'a> for GenomeCoordinate<'a> {
+    fn genome_coordinate(&self) -> &GenomeCoordinate<'a> {
         self
     }
 }
 
-fn batch_input_by_region<'a, I: BamLocusWorkInput<'a>>(
+fn batch_input_by_coordinate<'a, I: BamLocusWorkInput<'a>>(
     inputs: impl IntoIterator<Item = I>,
     window_size: usize,
 ) -> Vec<Vec<I>> {
@@ -55,10 +71,10 @@ fn batch_input_by_region<'a, I: BamLocusWorkInput<'a>>(
     let mut c_vec = vec![];
     let (mut c_contig, mut c_start) = match input_iter.next() {
         Some(inp) => {
-            let gr = inp.genome_region();
+            let gr = inp.genome_coordinate();
 
             let contig_clone = gr.contig.clone();
-            let start_val = gr.start;
+            let start_val = gr.pos;
             c_vec.push(inp);
             (contig_clone, start_val)
         }
@@ -67,16 +83,16 @@ fn batch_input_by_region<'a, I: BamLocusWorkInput<'a>>(
 
     let mut res: Vec<Vec<I>> = vec![];
     for inp in input_iter {
-        let gr = inp.genome_region();
+        let gc = inp.genome_coordinate();
         // Condition to start a new batch:
         // 1. The contig changes.
         // 2. The span from the batch's start to the current region's end exceeds window_size.
-        if c_contig == gr.contig && gr.end - c_start < window_size as i64 {
+        if c_contig == gc.contig && gc.pos - c_start < window_size as i64 {
             c_vec.push(inp);
         } else {
             res.push(c_vec); // Push the completed batch
-            c_contig = gr.contig.clone(); // Start a new batch: reset contig and start
-            c_start = gr.start;
+            c_contig = gc.contig.clone(); // Start a new batch: reset contig and start
+            c_start = gc.pos;
             c_vec = vec![inp]; // Start new batch with current region
         }
     }
@@ -126,7 +142,7 @@ impl<W: for<'a> BamLocusWorker<'a>> ParallelLocusProcessor<W> {
         batch_window_size: usize,
     ) -> Result<Vec<<W as BamLocusWorker<'a>>::Output>, Error> {
         // make batch
-        let batched_regions = batch_input_by_region(inputs.into_iter(), batch_window_size);
+        let batched_regions = batch_input_by_coordinate(inputs.into_iter(), batch_window_size);
 
         event!(
             Level::DEBUG,
@@ -152,40 +168,55 @@ impl<W: for<'a> BamLocusWorker<'a>> ParallelLocusProcessor<W> {
                     let first_elem = batch.first().unwrap();
                     let last_elem = batch.last().unwrap();
 
-                    let batch_contig = first_elem.genome_region().contig.as_str();
-                    let batch_pileup_start = first_elem.genome_region().start - 1; // batch is not empty, by the if condition of function start point.
-                    let batch_pileup_end = last_elem.genome_region().end - 1;
+                    let batch_contig = first_elem.genome_coordinate().contig.as_str();
+                    let batch_pileup_start = first_elem.genome_coordinate().pos - 1; // batch is not empty, by the if condition of function start point.
+                    let batch_pileup_end = last_elem.genome_coordinate().pos;
 
                     ir.fetch((batch_contig, batch_pileup_start, batch_pileup_end))?;
-                    let pileups = ir.pileup_with_option(PileupOption {
-                        max_depth: i32::MAX,
-                        ignore_overlaps: true,
-                    });
+                    let mut pileups = ir
+                        .pileup_with_option(PileupOption {
+                            max_depth: i32::MAX,
+                            ignore_overlaps: true,
+                        })
+                        .peekable();
 
-                    let mut target_pos_map = batch
-                        .into_iter()
-                        .map(|g| (g.genome_region().start - 1, g))
-                        .collect::<HashMap<_, _>>();
+                    // Create peekable iterators for both the pileups and the batch of inputs.
+                    let mut res = Vec::with_capacity(batch.len());
+                    
+                    let mut batch_peekable = batch.into_iter().peekable();
 
-                    let mut res = Vec::with_capacity(target_pos_map.len());
+                    // This is the efficient "merge/zip" sweep-line algorithm
+                    while let (Some(Ok(pileup_col)), Some(input)) =
+                        (pileups.peek(), batch_peekable.peek())
+                    {
+                        let pileup_pos = pileup_col.pos() as i64;
+                        // Assuming you've updated the trait to use GenomeCoordinate
+                        let target_pos = input.genome_coordinate().pos - 1;
 
-                    for plp_r in pileups {
-                        let plp = plp_r?;
-
-                        let inp = match target_pos_map.remove(&(plp.pos() as i64)) {
-                            Some(b) => b,
-                            None => continue,
-                        };
-
-                        let r = self
-                            .bam_locus_worker
-                            .work_for_locus(plp, inp)
-                            .map_err(|err| err.into())?;
-
-                        res.push(r);
-
-                        if target_pos_map.is_empty() {
-                            break;
+                        match pileup_pos.cmp(&target_pos) {
+                            Ordering::Less => {
+                                // Case 1: Pileup is before our target site.
+                                // Discard the pileup and advance the pileup iterator.
+                                pileups.next();
+                            }
+                            Ordering::Greater => {
+                                // Case 2: We've passed our target site, but there was no pileup (zero coverage).
+                                // Discard the target and advance the site iterator.
+                                batch_peekable.next();
+                            }
+                            Ordering::Equal => {
+                                // Case 3: Match found! Process it.
+                                // We must consume both items from the iterators to advance.
+                                if let (Some(Ok(plp)), Some(inp)) =
+                                    (pileups.next(), batch_peekable.next())
+                                {
+                                    let r = self
+                                        .bam_locus_worker
+                                        .work_for_locus(plp, inp)
+                                        .map_err(|err| err.into())?;
+                                    res.push(r);
+                                }
+                            }
                         }
                     }
 
@@ -216,7 +247,7 @@ mod tests {
 
     impl<'a> BamLocusWorker<'a> for MeanBPWorker {
         type Output = f64;
-        type Input = GenomeRegion<'a>;
+        type Input = GenomeCoordinate<'a>;
         type Error = Error;
 
         fn work_for_locus(
@@ -247,7 +278,7 @@ mod tests {
     fn parallel_locus_processor1() -> Result<(), Box<dyn std::error::Error>> {
         setup_logging_stderr_only_debug(LevelFilter::DEBUG)?;
 
-        let bam_path = "/home/eck/workspace/common_data/NA12878.chrom11.ILLUMINA.bwa.CEU.low_coverage.20121211.bam";
+        let bam_path = "/home/eck/workspace/common_resources/NA12878.chrom20.ILLUMINA.bwa.CEU.low_coverage.20121211.bam";
         let plp = ParallelLocusProcessor {
             bam_locus_worker: MeanBPWorker,
             n_threads: 4,
@@ -256,10 +287,9 @@ mod tests {
 
         let regions = (60000..(60000 + 1_000_000))
             .step_by(1000)
-            .map(|p| GenomeRegion {
-                contig: Chrom::Other("11".into()),
-                start: p,
-                end: p + 1,
+            .map(|p| GenomeCoordinate {
+                contig: Chrom::Other("20".into()),
+                pos: p,
             })
             .collect::<Vec<_>>();
 

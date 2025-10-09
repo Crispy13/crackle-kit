@@ -1,4 +1,4 @@
-use crate::data::region::GenomeRegion;
+use crate::data::locus::GenomeRegion;
 
 /// Batches an iterator of `GenomeRegion`s into `Vec<GenomeRegion>`s based on a `window_size`.
 ///

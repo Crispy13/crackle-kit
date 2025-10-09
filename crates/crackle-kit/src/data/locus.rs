@@ -1,6 +1,13 @@
 use std::{borrow::Cow, str::FromStr};
 
 use crate::data::chrom::Chrom;
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct GenomeCoordinate<'a> {
+    pub contig: Chrom<'a>,
+
+    /// 1-based position.
+    pub pos: i64,
+}
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct GenomeRegion<'a> {
