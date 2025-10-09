@@ -245,6 +245,8 @@ impl<W: for<'a> BamLocusWorker<'a>> ParallelLocusProcessor<W> {
 
 #[cfg(test)]
 mod tests {
+    use std::borrow::Cow;
+
     use tracing::level_filters::LevelFilter;
 
     use super::*;
@@ -307,5 +309,97 @@ mod tests {
         eprintln!("{} {:?}", r.len(), &r[..10]);
 
         Ok(())
+    }
+    
+    // Helper function to create coordinates for tests
+    fn coord<'a>(contig: &'a str, pos: i64) -> GenomeCoordinate<'a> {
+        GenomeCoordinate {
+            contig: Chrom::Other(Cow::Borrowed(contig)),
+            pos,
+        }
+    }
+
+    #[test]
+    fn test_standard_batching() {
+        let inputs = vec![
+            coord("chr1", 100),
+            coord("chr1", 200),
+            coord("chr1", 10000), // This should start a new batch
+            coord("chr1", 10100),
+        ];
+        let window_size = 1000;
+        let batches = batch_input_by_coordinate(inputs, window_size);
+
+        assert_eq!(batches.len(), 2);
+        assert_eq!(batches[0].len(), 2);
+        assert_eq!(batches[1].len(), 2);
+        assert_eq!(batches[0][0].pos, 100);
+        assert_eq!(batches[1][0].pos, 10000);
+    }
+
+    #[test]
+    fn test_contig_change() {
+        let inputs = vec![
+            coord("chr1", 100),
+            coord("chr1", 200),
+            coord("chr2", 300), // This must start a new batch
+            coord("chr2", 400),
+        ];
+        let window_size = 1000;
+        let batches = batch_input_by_coordinate(inputs, window_size);
+
+        assert_eq!(batches.len(), 2);
+        assert_eq!(batches[0].len(), 2);
+        assert_eq!(batches[1].len(), 2);
+        assert_eq!(batches[0][0].contig, Chrom::Other(Cow::Borrowed("chr1")));
+        assert_eq!(batches[1][0].contig, Chrom::Other(Cow::Borrowed("chr2")));
+    }
+
+    #[test]
+    fn test_window_size_boundary() {
+        let window_size = 1000;
+        let inputs = vec![
+            coord("chr1", 100),
+            coord("chr1", 1099), // gc.pos (1099) - c_start (100) = 999. This is < 1000, so it fits.
+            coord("chr1", 1100), // gc.pos (1100) - c_start (100) = 1000. This is NOT < 1000, new batch.
+        ];
+        
+        let batches = batch_input_by_coordinate(inputs, window_size);
+
+        assert_eq!(batches.len(), 2);
+        assert_eq!(batches[0].len(), 2); // The first two items should be in the first batch
+        assert_eq!(batches[1].len(), 1); // The third item starts a new batch
+        assert_eq!(batches[1][0].pos, 1100);
+    }
+
+    #[test]
+    fn test_empty_input() {
+        let inputs: Vec<GenomeCoordinate> = vec![];
+        let window_size = 1000;
+        let batches = batch_input_by_coordinate(inputs, window_size);
+        assert!(batches.is_empty());
+    }
+
+    #[test]
+    fn test_single_input() {
+        let inputs = vec![coord("chr1", 100)];
+        let window_size = 1000;
+        let batches = batch_input_by_coordinate(inputs, window_size);
+        assert_eq!(batches.len(), 1);
+        assert_eq!(batches[0].len(), 1);
+        assert_eq!(batches[0][0].pos, 100);
+    }
+    
+    #[test]
+    fn test_all_in_one_batch() {
+        let inputs = vec![
+            coord("chr1", 100),
+            coord("chr1", 200),
+            coord("chr1", 300),
+        ];
+        let window_size = 1000;
+        let batches = batch_input_by_coordinate(inputs, window_size);
+        assert_eq!(batches.len(), 1);
+        assert_eq!(batches[0].len(), 3);
     }
 }
