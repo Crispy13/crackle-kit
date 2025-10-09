@@ -26,7 +26,10 @@ pileup == site: Process the match and advance both iterators.
 */
 
 use std::{
-    cmp::Ordering, collections::{HashMap, HashSet}, i32, path::PathBuf
+    cmp::Ordering,
+    collections::{HashMap, HashSet},
+    i32,
+    path::PathBuf,
 };
 
 use anyhow::Error;
@@ -156,6 +159,8 @@ impl<W: for<'a> BamLocusWorker<'a>> ParallelLocusProcessor<W> {
             .build()?;
 
         let batch_res = tp.scope(|_scope| {
+            event!(Level::DEBUG, "Parallel Processing...");
+
             let r = batched_regions
                 .into_par_iter()
                 .map(|batch| {
@@ -182,7 +187,7 @@ impl<W: for<'a> BamLocusWorker<'a>> ParallelLocusProcessor<W> {
 
                     // Create peekable iterators for both the pileups and the batch of inputs.
                     let mut res = Vec::with_capacity(batch.len());
-                    
+
                     let mut batch_peekable = batch.into_iter().peekable();
 
                     // This is the efficient "merge/zip" sweep-line algorithm
@@ -222,12 +227,16 @@ impl<W: for<'a> BamLocusWorker<'a>> ParallelLocusProcessor<W> {
 
                     Ok::<_, Error>(res)
                 })
-                .collect::<Result<Vec<_>, Error>>()?
-                .into_iter()
-                .flatten()
-                .collect::<Vec<_>>();
+                .collect::<Result<Vec<_>, Error>>()?;
+            
+            
+            event!(Level::DEBUG, "Flatten Batched Results...");
 
-            Ok::<_, Error>(r)
+            let r2 = r.into_iter().flatten().collect::<Vec<_>>();
+            
+            event!(Level::DEBUG, "Done.");
+
+            Ok::<_, Error>(r2)
         })?;
 
         Ok(batch_res)
