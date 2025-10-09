@@ -4,3 +4,5 @@ audiophile.ipynb
 crates/crackle-kit/flamegraph.svg
 crates/crackle-kit/perf.data
 crates/crackle-kit/perf.data.old
+
+.vscode/
