@@ -33,3 +33,7 @@ bam = ["dep:rust-htslib", "rust-htslib/libdeflate", "dep:rayon"]
 [[bench]]
 name = "bench1"
 harness = false
+
+[[bench]]
+name = "hashmap_mergezip"
+harness = false

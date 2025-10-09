@@ -9,22 +9,6 @@
 //!
 //!
 
-/*
-251009 TODO: Refactor ParallelLocusProcessor for Correctness and Performance
-The current implementation has a critical bug: the HashMap logic only checks the start coordinate of a region. This must be replaced to correctly handle all sites.
-
-The plan is to enforce a 1-bp site constraint and replace the core algorithm with a "merge/zip" (sweep-line) approach.
-
-Algorithm:
-Inside the rayon::map closure, process the sorted pileup iterator and the sorted batch of inputs in a single pass. Use peekable() on both iterators and match on the cmp() result of their positions to handle the three cases:
-
-pileup < site: Advance the pileup iterator.
-
-pileup > site: Advance the site iterator.
-
-pileup == site: Process the match and advance both iterators.
-*/
-
 use std::{
     cmp::Ordering,
     collections::{HashMap, HashSet},
