@@ -49,6 +49,15 @@ const CODE_TO_CHAR_LOOKUP: [char; 6] = {
     arr
 };
 
+/// Memory Efficient Base Array
+///
+/// This stores a dna base as 3-bit to u16 or u64.
+/// 
+/// Supported bases are: A, T, C, G, N. All other bases raises error when this is being initialized.
+/// 
+/// This has const generic, to control the size of the array.  
+/// 
+/// The default N is 8. You may need to use smaller values, if you only store very short sequences (e.g. 4-bases seqeunce)
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct BaseArr<C = u64, const N: usize = BASE_ARR_LEN> {
     inner: [C; N],
@@ -59,7 +68,7 @@ macro_rules! impl_display {
         /// A more efficient and safer Display implementation.
         /// It iterates through each potential base position and stops
         /// as soon as it encounters a NULL_CODE terminator.
-        impl<const N:usize> std::fmt::Display for BaseArr<$type, N> {
+        impl<const N: usize> std::fmt::Display for BaseArr<$type, N> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 'outer: for chunk in self.inner {
                     for i in 0..$n_bases_in_chunk {
@@ -445,6 +454,19 @@ mod tests {
         ($type_name:ident, $type:ty) => {
             mod $type_name {
                 use super::*;
+
+                #[test]
+                fn test_invalid_bases() -> Result<(), Box<dyn std::error::Error>> {
+                    let seq = b"ATWWQT";
+                    let arr = BaseArr::<$type>::from_bytes(seq);
+
+                    assert_eq!(
+                        arr.map_err(|err| err.to_string()).unwrap_err(),
+                        "Invalid base 'W' at position 2"
+                    );
+
+                    Ok(())
+                }
 
                 #[test]
                 fn test_new_and_get_simple() -> Result<(), Error> {
