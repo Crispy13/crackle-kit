@@ -71,10 +71,10 @@ fn batch_input_by_coordinate<'a, I: BamLocusWorkInput<'a>>(
     let mut c_vec = vec![];
     let (mut c_contig, mut c_start) = match input_iter.next() {
         Some(inp) => {
-            let gr = inp.genome_coordinate();
+            let gc = inp.genome_coordinate();
 
-            let contig_clone = gr.contig.clone();
-            let start_val = gr.pos;
+            let contig_clone = gc.contig.clone();
+            let start_val = gc.pos;
             c_vec.push(inp);
             (contig_clone, start_val)
         }
@@ -223,8 +223,8 @@ impl<W: for<'a> BamLocusWorker<'a>> ParallelLocusProcessor<W> {
                     Ok::<_, Error>(res)
                 })
                 .collect::<Result<Vec<_>, Error>>()?
-                .into_par_iter()
-                .flatten_iter()
+                .into_iter()
+                .flatten()
                 .collect::<Vec<_>>();
 
             Ok::<_, Error>(r)
