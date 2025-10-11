@@ -41,8 +41,9 @@ impl<T> BatchedData<T> {
         &mut self.inner[..self.next_item_idx]
     }
 
-    /// Gets a mutable reference to the next available slot and advances the index.
-    /// Returns None if the batch is full.
+    /// Gets a mutable reference to the next available slot and **advances the next item index**.
+    /// 
+    /// Returns `None` if the batch is full.
     pub fn next_mut(&mut self) -> Option<&mut T> {
         if self.is_full() {
             None
@@ -91,10 +92,24 @@ impl<T> BatchedData<T> {
         self.next_item_idx = 0;
     }
 
+    /// Set next item index to 0.
+    /// Next `next_mut()` call will return the first item.
+    /// 
+    /// Note that inner data will be untouched. 
+    /// 
+    /// If you want to do something for the data, use `clear_with()` method.
+    pub fn reset_index(&mut self) {
+        self.next_item_idx = 0;
+    }
+
     /// Returns true if no more items can be added.
     #[inline]
     pub fn is_full(&self) -> bool {
         self.next_item_idx >= self.inner.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.next_item_idx == 0
     }
 
     /// Returns the total capacity of the batch.

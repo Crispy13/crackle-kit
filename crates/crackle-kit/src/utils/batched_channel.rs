@@ -54,7 +54,7 @@ pub struct BatchedChannel<T> {
 }
 
 impl<T> BatchedChannel<T> {
-    fn new(
+    pub fn new(
         data_init: impl Fn() -> T,
         data_batch_size: usize,
         channel_capacity: usize,
@@ -83,6 +83,8 @@ impl<T> BatchedChannel<T> {
         })
     }
 }
+
+
 
 #[cfg(test)]
 mod tests {
