@@ -25,7 +25,7 @@ use std::{
 };
 
 use anyhow::Error;
-use crossbeam_channel::{Sender, TryRecvError, bounded};
+use crossbeam_channel::{bounded, RecvError, Sender, TryRecvError};
 use indicatif::ProgressBar;
 use rayon::{
     ThreadPoolBuilder,
@@ -322,15 +322,18 @@ impl<R: RecordModifier> ParallelBamProcessor<R> {
                 let mut i = 0;
 
                 'batched_process_loop: loop {
-                    let mut record_batch = match rx_buf_clone.try_recv() {
+                    let mut record_batch = match rx_buf_clone.recv() {
                         Ok(v) => v,
-                        Err(TryRecvError::Empty) => {
-                            sleep(Duration::from_millis(10));
-                            continue;
-                        }
-                        Err(TryRecvError::Disconnected) => {
+                        Err(RecvError) => {
                             break;
                         }
+                        // Err(TryRecvError::Empty) => {
+                        //     sleep(Duration::from_millis(10));
+                        //     continue;
+                        // }
+                        // Err(TryRecvError::Disconnected) => {
+                        //     break;
+                        // }
                     };
 
                     while let Some(record_with_idx) = record_batch.next_mut() {
@@ -399,13 +402,9 @@ impl<R: RecordModifier> ParallelBamProcessor<R> {
                     let header_view = Rc::new(HeaderView::from_bytes(&header_view));
 
                     loop {
-                        let mut record_batch = match rx_read_clone.try_recv() {
+                        let mut record_batch = match rx_read_clone.recv() {
                             Ok(v) => v,
-                            Err(TryRecvError::Empty) => {
-                                sleep(Duration::from_millis(10));
-                                continue;
-                            }
-                            Err(TryRecvError::Disconnected) => {
+                            Err(RecvError) => {
                                 event!(
                                     Level::DEBUG,
                                     "Checked end of channel from reader, thread {:?}",
@@ -413,6 +412,18 @@ impl<R: RecordModifier> ParallelBamProcessor<R> {
                                 );
                                 break;
                             }
+                            // Err(TryRecvError::Empty) => {
+                            //     sleep(Duration::from_millis(10));
+                            //     continue;
+                            // }
+                            // Err(TryRecvError::Disconnected) => {
+                            //     event!(
+                            //         Level::DEBUG,
+                            //         "Checked end of channel from reader, thread {:?}",
+                            //         thread::current().id()
+                            //     );
+                            //     break;
+                            // }
                         };
 
                         for record_with_idx in record_batch.filled_mut() {
@@ -541,17 +552,21 @@ impl<R: RecordModifier> ParallelBamProcessor<R> {
                 }
 
                 loop {
-                    let mut record_batch_from_chan = match rx_worker.try_recv() {
+                    let mut record_batch_from_chan = match rx_worker.recv() {
                         Ok(v) => v,
-                        Err(TryRecvError::Empty) => {
-                            sleep(Duration::from_millis(10));
-                            continue;
-                        }
-                        Err(TryRecvError::Disconnected) => {
+                        Err(RecvError) => {
                             event!(Level::DEBUG, "rx processed closed.");
-                            sleep(Duration::from_secs(2));
                             break;
                         }
+                        // Err(TryRecvError::Empty) => {
+                        //     sleep(Duration::from_millis(10));
+                        //     continue;
+                        // }
+                        // Err(TryRecvError::Disconnected) => {
+                        //     event!(Level::DEBUG, "rx processed closed.");
+                        //     sleep(Duration::from_secs(2));
+                        //     break;
+                        // }
                     };
 
                     let maximum_batch_gen = 1024;
