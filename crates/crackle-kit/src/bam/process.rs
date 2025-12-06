@@ -126,13 +126,13 @@ fn batch_input_by_coordinate<'a, I: BamLocusWorkInput<'a>>(
 ///
 ///
 /// ```
-pub struct ParallelLocusProcessor<W: for<'a> BamLocusWorker<'a>> {
+pub struct ParallelLocusProcessorPileup<W: for<'a> BamLocusWorker<'a>> {
     bam_locus_worker: W,
     n_threads: usize,
     bam_path: PathBuf,
 }
 
-impl<W: for<'a> BamLocusWorker<'a>> ParallelLocusProcessor<W> {
+impl<W: for<'a> BamLocusWorker<'a>> ParallelLocusProcessorPileup<W> {
     pub fn new(bam_locus_worker: W, n_threads: usize, bam_path: PathBuf) -> Self {
         Self {
             bam_locus_worker,
@@ -709,7 +709,7 @@ mod tests {
         setup_logging_stderr_only_debug(LevelFilter::DEBUG)?;
 
         let bam_path = "/home/eck/workspace/common_resources/NA12878.chrom20.ILLUMINA.bwa.CEU.low_coverage.20121211.bam";
-        let plp = ParallelLocusProcessor {
+        let plp = ParallelLocusProcessorPileup {
             bam_locus_worker: MeanBPWorker,
             n_threads: 4,
             bam_path: bam_path.into(),
