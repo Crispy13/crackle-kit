@@ -248,6 +248,8 @@ impl<W: for<'a> BamLocusWorker<'a>> ParallelLocusProcessorPileup<W> {
 
 // }
 
+
+
 pub trait RecordModifier: Send + Sync {
     // type Input: RecordModifierInput;
     // type Output: Send + Sync;
