@@ -16,5 +16,7 @@ pub mod data;
 
 #[cfg(feature="bam")]
 pub mod bam;
+
+#[cfg(feature="bam")]
 // re-export
 pub use rust_htslib;
