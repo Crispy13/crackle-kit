@@ -1,6 +1,9 @@
-pub mod tracing;
+pub mod tracing_kit;
 mod err_opt_ext;
 mod macros;
+
+// re-export
+pub use tracing;
 
 #[cfg(feature="memfd")]
 mod memfd_file;
