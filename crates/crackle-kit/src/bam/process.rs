@@ -672,7 +672,7 @@ mod tests {
 
     use super::*;
     use crate::{
-        bam::process::BamLocusWorker, data::chrom::Chrom, tracing::{setup_logging_stderr_only, setup_logging_stderr_only_debug},
+        bam::process::BamLocusWorker, data::chrom::Chrom, tracing_kit::{setup_logging_stderr_only, setup_logging_stderr_only_debug},
     };
 
     struct MeanBPWorker;
