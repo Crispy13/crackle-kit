@@ -2,6 +2,9 @@ use std::fmt::Write;
 
 use indicatif::{ProgressBar, ProgressDrawTarget, ProgressState, ProgressStyle};
 
+/// Make indicatif::ProgressBar instance.
+/// 
+/// You can give `0` to len argument, then a question mark will be on progress bar.
 pub fn prepare_pbar(len: u64) -> ProgressBar {
     let pb = ProgressBar::new(len);
 
