@@ -2,7 +2,7 @@ use std::fmt::Write;
 
 use indicatif::{ProgressBar, ProgressDrawTarget, ProgressState, ProgressStyle};
 
-fn prepare_pbar(len: u64) -> ProgressBar {
+pub fn prepare_pbar(len: u64) -> ProgressBar {
     let pb = ProgressBar::new(len);
 
     pb.set_draw_target(ProgressDrawTarget::stderr_with_hz(8));
