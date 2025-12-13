@@ -1,16 +1,21 @@
-pub mod tracing_kit;
+
 mod err_opt_ext;
 mod macros;
 
-pub mod pbar;
+
 mod nuc_base_map;
 mod utils;
 
 pub mod data;
 
-
-// re-export
+#[cfg(feature="tracing")]
+pub mod tracing_kit;
+#[cfg(feature="tracing")]
 pub use tracing;
+
+#[cfg(feature="pbar")]
+pub mod pbar;
+#[cfg(feature="pbar")]
 pub use indicatif;
 
 #[cfg(feature="memfd")]
