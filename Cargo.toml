@@ -8,17 +8,17 @@ version = "0.1.0"
 edition = "2024"
 
 [workspace.dependencies]
-anyhow = "1.0.95"
-tracing = "0.1.41"
-tracing-appender = "0.2.3"
-tracing-subscriber = { version = "0.3.19", features = ["chrono", "env-filter"] }
+anyhow = "1.0.100"
+tracing = "0.1.43"
+tracing-appender = "0.2.4"
+tracing-subscriber = { version = "0.3.22", features = ["chrono", "env-filter"] }
 macros = { path = "crates/macros" }
 macro_impl = { path = "crates/macros/macro_impl" }
 paste = "1.0.15"
 nix = { version = "0.30.1", features = ["fs"] }
-flate2 = { version = "1.1.1", features = ["zlib-rs"], default-features = false }
+flate2 = { version = "1.1.5", features = ["zlib-rs"], default-features = false }
 crossbeam-channel = { version = "0.5.15" }
-indicatif = { version = "0.17.11" }
+indicatif = { version = "0.18.3" }
 criterion = "*"
 
 
