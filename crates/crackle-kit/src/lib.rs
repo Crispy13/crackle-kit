@@ -1,12 +1,15 @@
 
 mod err_opt_ext;
-mod macros;
+
 
 
 mod nuc_base_map;
 mod utils;
 
 pub mod data;
+
+#[cfg(feature="macros")]
+pub mod macros;
 
 #[cfg(feature="tracing")]
 pub mod tracing_kit;

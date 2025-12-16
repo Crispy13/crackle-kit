@@ -345,7 +345,6 @@ dependencies = [
  "crossbeam-channel",
  "flate2",
  "indicatif",
- "macros",
  "nix",
  "paste",
  "rand 0.9.2",
