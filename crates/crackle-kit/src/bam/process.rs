@@ -41,11 +41,9 @@ use crate::{
     data::{
         data_with_index::DataWithIndex,
         locus::{GenomeCoordinate, GenomeRegion},
-    },
-    utils::{
+    }, pbar::prepare_pbar, utils::{
         batch_region::batch_region, batched_channel::BatchedChannel, batched_data::BatchedData,
-        pbar::prepare_pbar,
-    },
+    }
 };
 
 const N_1M: usize = 10_usize.pow(6);

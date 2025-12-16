@@ -151,7 +151,7 @@ mod tests {
 #[cfg(test)]
 #[cfg(feature = "bio")]
 mod fasta_tests {
-    use crate::data::chrom::Chrom;
+    use crate::{data::chrom::Chrom, utils::binning::fasta::make_bins_from_fasta};
 
     use super::*;
 
