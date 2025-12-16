@@ -1,5 +1,3 @@
-#[cfg(feature = "bio")]
-use self::fasta::*;
 use std::path::Path;
 
 pub fn make_bins(start: usize, end: usize, bin_size: usize) -> Vec<(usize, usize)> {

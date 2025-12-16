@@ -25,12 +25,13 @@ criterion = { workspace = true }
 rand = "0.9.2"
 
 [features]
-default = ["tracing"]
+default = []
 memfd = ["dep:nix"]
 fastq = ["dep:flate2"]
 htslib = ["dep:rust-htslib"]
+batch-work = ["dep:crossbeam-channel"]
 bio = ["dep:bio"]
-bam = ["dep:rust-htslib", "rust-htslib/libdeflate", "dep:rayon", "dep:crossbeam-channel"]
+bam = ["dep:rust-htslib", "rust-htslib/libdeflate", "dep:rayon", "tracing", "pbar"]
 pbar = ["dep:indicatif"]
 tracing = ["dep:tracing", "dep:tracing-appender", "dep:tracing-subscriber"]
 macros = ["dep:paste"]
