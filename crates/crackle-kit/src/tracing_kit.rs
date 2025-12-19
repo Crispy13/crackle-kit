@@ -227,7 +227,32 @@ pub fn setup_logging_stderr_only(
     Ok(reload_handle)
 }
 
+#[deprecated = "Renamed. Use `setup_logging_stderr_only_verbose` instead."]
 pub fn setup_logging_stderr_only_debug(
+    stderr_log_level: filter::LevelFilter,
+) -> Result<
+    reload::Handle<
+        filter::Filtered<
+            tracing_subscriber::fmt::Layer<
+                tracing_subscriber::Registry,
+                tracing_subscriber::fmt::format::Pretty,
+                tracing_subscriber::fmt::format::Format<
+                    tracing_subscriber::fmt::format::Pretty,
+                    ChronoLocal,
+                >,
+                impl Fn() -> io::Stderr,
+            >,
+            EnvFilter,
+            tracing_subscriber::Registry,
+        >,
+        tracing_subscriber::Registry,
+    >,
+    Error,
+> {
+    setup_logging_stderr_only_verbose(stderr_log_level)
+}
+
+pub fn setup_logging_stderr_only_verbose(
     stderr_log_level: filter::LevelFilter,
 ) -> Result<
     reload::Handle<
