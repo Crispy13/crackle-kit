@@ -7,6 +7,7 @@ mod nuc_base_map;
 mod utils;
 
 pub mod data;
+pub mod zerocopy;
 
 #[cfg(feature="macros")]
 pub mod macros;

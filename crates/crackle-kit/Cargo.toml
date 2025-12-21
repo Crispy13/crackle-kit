@@ -44,3 +44,7 @@ harness = false
 [[bench]]
 name = "hashmap_mergezip"
 harness = false
+
+[[bench]]
+name = "zerocopy_read"
+harness = false
