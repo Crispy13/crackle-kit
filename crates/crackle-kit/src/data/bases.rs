@@ -1,4 +1,11 @@
-use std::ops::{Index, Range, RangeFrom, RangeFull, RangeTo};
+pub mod rev_comp;
+
+use std::{
+    arch::x86_64::{
+        _mm256_loadu_si256, _mm256_permute2x128_si256, _mm256_shuffle_epi8, _mm256_storeu_si256,
+    },
+    ops::{Index, Range, RangeFrom, RangeFull, RangeTo},
+};
 
 use anyhow::{Error, anyhow};
 
@@ -52,11 +59,11 @@ const CODE_TO_CHAR_LOOKUP: [char; 6] = {
 /// Memory Efficient Base Array
 ///
 /// This stores a dna base as 3-bit to u16 or u64.
-/// 
+///
 /// Supported bases are: A, T, C, G, N. All other bases raises error when this is being initialized.
-/// 
+///
 /// This has const generic, to control the size of the array.  
-/// 
+///
 /// The default N is 8. You may need to use smaller values, if you only store very short sequences (e.g. 4-bases seqeunce)
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct BaseArr<C = u64, const N: usize = BASE_ARR_LEN> {
@@ -445,6 +452,7 @@ impl TryFrom<u8> for Base {
     }
 }
 
+
 // --- TEST FUNCTIONS ---
 #[cfg(test)]
 mod tests {
@@ -748,3 +756,4 @@ mod tests {
     make_test_functions!(u16, u16);
     make_test_functions!(u64, u64);
 }
+
