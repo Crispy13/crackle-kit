@@ -3,13 +3,15 @@ use std::arch::x86_64::{
     _mm256_storeu_si256,
 };
 
+use crate::data::bases::comp::complement_base;
+
 // Same constants as before
-const SIMD_RC_LUT: [u8; 32] = [
+pub(crate) const SIMD_COMPLEMENT_LUT: [u8; 32] = [
     0, 'T' as u8, 0, 'G' as u8, 'A' as u8, 'A' as u8, 0, 'C' as u8, 0, 0, 0, 0, 0, 0, 'N' as u8, 0,
     0, 'T' as u8, 0, 'G' as u8, 'A' as u8, 'A' as u8, 0, 'C' as u8, 0, 0, 0, 0, 0, 0, 'N' as u8, 0,
 ];
 
-const SIMD_REV_MASK: [u8; 32] = [
+pub(crate) const SIMD_REV_MASK: [u8; 32] = [
     15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, // lane 1
     15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, // lane 2
 ];
@@ -18,14 +20,7 @@ const SIMD_REV_MASK: [u8; 32] = [
 fn reverse_complement_scalar(src: &[u8], dst: &mut [u8]) {
     let len = src.len();
     for (k, &b) in src.iter().enumerate() {
-        let comp = match b {
-            b'A' | b'a' => b'T',
-            b'C' | b'c' => b'G',
-            b'G' | b'g' => b'C',
-            b'T' | b't' => b'A',
-            b'N' | b'n' => b'N',
-            _ => b'N',
-        };
+        let comp = complement_base(b);
         // Fill from the end of the provided slice
         dst[len - 1 - k] = comp;
     }
@@ -35,21 +30,13 @@ fn reverse_complement_scalar(src: &[u8], dst: &mut [u8]) {
 fn reverse_complement_scalar_ptr(src: &[u8], dst: *mut u8) {
     let len = src.len();
     for (k, &b) in src.iter().enumerate() {
-        let comp = match b {
-            b'A' | b'a' => b'T',
-            b'C' | b'c' => b'G',
-            b'G' | b'g' => b'C',
-            b'T' | b't' => b'A',
-            b'N' | b'n' => b'N',
-            _ => b'N',
-        };
+        let comp = complement_base(b);
 
         let offset = len - 1 - k;
         // Fill from the end of the provided slice
         unsafe { *dst.add(offset) = comp };
     }
 }
-
 
 #[target_feature(enable = "avx2")]
 unsafe fn reverse_complement_avx2(src: &[u8], dst_ptr: *mut u8) {
@@ -58,7 +45,7 @@ unsafe fn reverse_complement_avx2(src: &[u8], dst_ptr: *mut u8) {
 
     unsafe {
         // Load lookup table and reverse mask
-        let lut = _mm256_loadu_si256(SIMD_RC_LUT.as_ptr() as *const _);
+        let lut = _mm256_loadu_si256(SIMD_COMPLEMENT_LUT.as_ptr() as *const _);
         let rev_mask = _mm256_loadu_si256(SIMD_REV_MASK.as_ptr() as *const _);
 
         // Process 32 bytes at a time
@@ -108,7 +95,7 @@ unsafe fn rc_avx2_unrolled(mut src_ptr: *const u8, dst_base: *mut u8, len: usize
         // Destination pointer starts at the END of the buffer
         let mut dst_ptr = dst_base.add(len);
 
-        let lut = _mm256_loadu_si256(SIMD_RC_LUT.as_ptr() as *const _);
+        let lut = _mm256_loadu_si256(SIMD_COMPLEMENT_LUT.as_ptr() as *const _);
         let rev_mask = _mm256_loadu_si256(SIMD_REV_MASK.as_ptr() as *const _);
 
         // OPTIMIZATION 2: Unroll loop 4x (128 bytes per iter)
@@ -192,7 +179,20 @@ pub struct RevComplementor {
 }
 
 impl RevComplementor {
-    pub fn new(mode: RevCompMode) -> RevComplementor {
+    pub fn new() -> RevComplementor {
+        let mode = if is_x86_feature_detected!("avx2") {
+            RevCompMode::SIMD
+        } else {
+            RevCompMode::Normal
+        };
+
+        Self {
+            mode,
+            buf: Default::default(),
+        }
+    }
+
+    pub fn with_mode(mode: RevCompMode) -> RevComplementor {
         match mode {
             RevCompMode::Normal => {}
             RevCompMode::NormalPtr => {}
@@ -261,12 +261,12 @@ mod rc_tests {
         let mut rng = rand::thread_rng();
 
         // 1. Setup Runners
-        let mut normal_runner = RevComplementor::new(RevCompMode::Normal);
-        let mut normal_ptr_runner = RevComplementor::new(RevCompMode::NormalPtr);
+        let mut normal_runner = RevComplementor::with_mode(RevCompMode::Normal);
+        let mut normal_ptr_runner = RevComplementor::with_mode(RevCompMode::NormalPtr);
 
         // Only run SIMD checks if the CPU supports it
         let mut simd_runner = if is_x86_feature_detected!("avx2") {
-            Some(RevComplementor::new(RevCompMode::SIMD))
+            Some(RevComplementor::with_mode(RevCompMode::SIMD))
         } else {
             println!("Skipping SIMD test: AVX2 not detected on this machine.");
             None
@@ -274,7 +274,7 @@ mod rc_tests {
 
         // Only run SIMD checks if the CPU supports it
         let mut simd_unrolled_runner = if is_x86_feature_detected!("avx2") {
-            Some(RevComplementor::new(RevCompMode::SIMDUnrolled4x))
+            Some(RevComplementor::with_mode(RevCompMode::SIMDUnrolled4x))
         } else {
             // println!("Skipping SIMD test: AVX2 not detected on this machine.");
             None

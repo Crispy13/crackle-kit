@@ -3,13 +3,24 @@ use std::hint::black_box;
 use criterion::{criterion_group, criterion_main, Criterion, Throughput};
 // Replace 'your_crate_name' with the actual name of your library crate
 use crackle_kit::data::bases::rev_comp::{RevCompMode, RevComplementor}; 
-use rand::Rng;
+use rand::{Rng, SeedableRng};
+
 
 fn generate_dna(len: usize) -> Vec<u8> {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rngs::StdRng::seed_from_u64(1);
     (0..len)
-        .map(|_| match rng.gen_range(0..4) {
-            0 => b'A', 1 => b'C', 2 => b'G', _ => b'T',
+        .map(|_| match rng.random_range(0..10) {
+            0 => b'A',
+            1 => b'C',
+            2 => b'G',
+            3 => b'T',
+            4 => b'N',
+            5 => b'a',
+            6 => b'c',
+            7 => b'g',
+            8 => b't',
+            9 => b'n',
+            _ => unreachable!(),
         })
         .collect()
 }
@@ -25,7 +36,7 @@ fn bench_reverse_complement(c: &mut Criterion) {
 
     // 1. Normal (Safe, includes memset/zeroing)
     group.bench_function("150bp/Scalar (Safe)", |b| {
-        let mut runner = RevComplementor::new(RevCompMode::Normal);
+        let mut runner = RevComplementor::with_mode(RevCompMode::Normal);
         // Pre-warm to ensure capacity is allocated
         runner.reverse_complement(&input_small); 
         
@@ -36,7 +47,7 @@ fn bench_reverse_complement(c: &mut Criterion) {
 
     // 2. Normal Ptr (Unsafe, NO zeroing) -> TRUE Scalar Baseline
     group.bench_function("150bp/Scalar (Ptr)", |b| {
-        let mut runner = RevComplementor::new(RevCompMode::NormalPtr);
+        let mut runner = RevComplementor::with_mode(RevCompMode::NormalPtr);
         runner.reverse_complement(&input_small); 
 
         b.iter(|| {
@@ -47,7 +58,7 @@ fn bench_reverse_complement(c: &mut Criterion) {
     // 3. SIMD (AVX2)
     if is_x86_feature_detected!("avx2") {
         group.bench_function("150bp/SIMD (AVX2)", |b| {
-            let mut runner = RevComplementor::new(RevCompMode::SIMD);
+            let mut runner = RevComplementor::with_mode(RevCompMode::SIMD);
             runner.reverse_complement(&input_small); 
 
             b.iter(|| {
@@ -58,7 +69,7 @@ fn bench_reverse_complement(c: &mut Criterion) {
 
     if is_x86_feature_detected!("avx2") {
         group.bench_function("150bp/SIMD Unrolled (AVX2)", |b| {
-            let mut runner = RevComplementor::new(RevCompMode::SIMDUnrolled4x);
+            let mut runner = RevComplementor::with_mode(RevCompMode::SIMDUnrolled4x);
             runner.reverse_complement(&input_small); 
 
             b.iter(|| {
@@ -74,7 +85,7 @@ fn bench_reverse_complement(c: &mut Criterion) {
     group.throughput(Throughput::Bytes(len_large as u64));
 
     group.bench_function("100KB/Scalar (Safe)", |b| {
-        let mut runner = RevComplementor::new(RevCompMode::Normal);
+        let mut runner = RevComplementor::with_mode(RevCompMode::Normal);
         runner.reverse_complement(&input_large); 
         b.iter(|| {
             black_box(runner.reverse_complement(black_box(&input_large)));
@@ -82,7 +93,7 @@ fn bench_reverse_complement(c: &mut Criterion) {
     });
 
     group.bench_function("100KB/Scalar (Ptr)", |b| {
-        let mut runner = RevComplementor::new(RevCompMode::NormalPtr);
+        let mut runner = RevComplementor::with_mode(RevCompMode::NormalPtr);
         runner.reverse_complement(&input_large); 
         b.iter(|| {
             black_box(runner.reverse_complement(black_box(&input_large)));
@@ -91,7 +102,7 @@ fn bench_reverse_complement(c: &mut Criterion) {
 
     if is_x86_feature_detected!("avx2") {
         group.bench_function("100KB/SIMD (AVX2)", |b| {
-            let mut runner = RevComplementor::new(RevCompMode::SIMD);
+            let mut runner = RevComplementor::with_mode(RevCompMode::SIMD);
             runner.reverse_complement(&input_large); 
             b.iter(|| {
                 black_box(runner.reverse_complement(black_box(&input_large)));
@@ -101,7 +112,7 @@ fn bench_reverse_complement(c: &mut Criterion) {
 
     if is_x86_feature_detected!("avx2") {
         group.bench_function("100KB/SIMD Unrolled (AVX2)", |b| {
-            let mut runner = RevComplementor::new(RevCompMode::SIMDUnrolled4x);
+            let mut runner = RevComplementor::with_mode(RevCompMode::SIMDUnrolled4x);
             runner.reverse_complement(&input_large); 
             b.iter(|| {
                 black_box(runner.reverse_complement(black_box(&input_large)));

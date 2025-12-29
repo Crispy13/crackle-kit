@@ -1,4 +1,5 @@
 pub mod rev_comp;
+pub mod comp;
 
 use std::{
     arch::x86_64::{
