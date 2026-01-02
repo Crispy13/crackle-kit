@@ -209,11 +209,6 @@ impl RevComplementor {
         }
     }
 
-    #[inline]
-    pub fn complement_base(b: u8) -> u8 {
-        complement_base(b)
-    }
-
     pub fn reverse_complement(&mut self, seq: &[u8]) -> &[u8] {
         self.buf.clear();
 

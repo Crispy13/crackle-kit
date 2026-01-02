@@ -3,7 +3,7 @@ use std::arch::x86_64::{_mm256_loadu_si256, _mm256_shuffle_epi8, _mm256_storeu_s
 use crate::data::bases::rev_comp::SIMD_COMPLEMENT_LUT;
 
 #[inline]
-pub(crate) fn complement_base(b: u8) -> u8 {
+pub fn complement_base(b: u8) -> u8 {
     match b {
         b'A' | b'a' => b'T',
         b'C' | b'c' => b'G',
