@@ -48,3 +48,10 @@ harness = false
 [[bench]]
 name = "zerocopy_read"
 harness = false
+[[bench]]
+name = "rev_comp"
+harness = false
+
+[[bench]]
+name = "comp"
+harness = false
