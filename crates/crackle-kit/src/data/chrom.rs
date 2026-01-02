@@ -82,7 +82,13 @@ impl<'a> FromStr for Chrom<'a> {
     type Err = std::convert::Infallible;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let r = match s {
+        let s2 = if s.starts_with("chr") {
+            s
+        } else {
+            &format!("chr{s}")
+        };
+
+        let r = match s2 {
             CHR1 => Chrom::Chr1,
             CHR2 => Chrom::Chr2,
             CHR3 => Chrom::Chr3,

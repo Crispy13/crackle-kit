@@ -31,7 +31,7 @@ fn normal_read_lines(path: &str) -> usize {
 // No new memory is allocated for the data.
 fn zero_copy_read(path: &str) -> usize {
     let file = File::open(path).expect("File not found");
-    let mut reader = BufReader::new(file);
+    let mut reader = BufReader::with_capacity(8192 * 2, file);
     let mut count = 0;
 
     loop {
