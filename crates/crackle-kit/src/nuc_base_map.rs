@@ -4,7 +4,7 @@ use std::borrow::Borrow;
 /// It stores dna base count in an array in order: A T C G N
 /// 
 /// Note that other than the 5 bases are not supported.
-pub struct NucBaseMap<T> {
+pub struct NucBaseMap<T=usize> {
     inner: [T; 5],
 }
 
