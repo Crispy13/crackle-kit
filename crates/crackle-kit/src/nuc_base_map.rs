@@ -1,5 +1,7 @@
 use std::{borrow::Borrow, collections::HashMap};
 
+use anyhow::{Error, anyhow};
+
 /// DNA base map.
 /// It stores `T` per dna base in an array in order: A T C G N
 ///
@@ -18,6 +20,7 @@ impl<T: Default> Default for NucBaseMap<T> {
 
 impl<T> NucBaseMap<T> {
     const NUC_BASES: [u8; 5] = [b'A', b'T', b'C', b'G', b'N'];
+    const NUC_BASES_CHAR: [char; 5] = ['A', 'T', 'C', 'G', 'N'];
 
     const NUC_IDX_ARR: [usize; 256] = Self::make_nuc_idx_arr();
 
@@ -57,7 +60,7 @@ impl<T> NucBaseMap<T> {
 
     /// Inserts a value computed from `f` into the option if it is [`None`],
     /// then returns a mutable reference to the contained value.
-    /// 
+    ///
     /// [`None`] if a non supported base is given.
     pub fn get_or_insert_with(&mut self, nuc_base: u8, f: impl FnOnce() -> T) -> Option<&mut T> {
         let idx = Self::get_nuc_idx(nuc_base);
@@ -67,6 +70,24 @@ impl<T> NucBaseMap<T> {
         } else {
             None
         }
+    }
+
+    /// Inserts a value computed from `f` into the option if it is [`None`],
+    /// then returns a mutable reference to the contained value.
+    ///
+    /// [`Err`] if a non supported base is given.
+    pub fn get_checked_or_insert_with(
+        &mut self,
+        nuc_base: u8,
+        f: impl FnOnce() -> T,
+    ) -> Result<&mut T, Error> {
+        self.get_or_insert_with(nuc_base, f).ok_or_else(|| {
+            anyhow!(
+                "Non supported base: {}. Supported bases: {:?}",
+                nuc_base as char,
+                Self::NUC_BASES_CHAR
+            )
+        })
     }
 
     /// Get mutable reference of value of input base key. `None` if the key has no value or a non supported base is given.
