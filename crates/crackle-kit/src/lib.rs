@@ -3,7 +3,7 @@ mod err_opt_ext;
 
 
 
-mod nuc_base_map;
+pub mod nuc_base_map;
 mod utils;
 
 pub mod data;
