@@ -1,17 +1,17 @@
-use std::borrow::Borrow;
+use std::{borrow::Borrow, collections::HashMap};
 
 /// DNA base map.
-/// It stores T per dna base in an array in order: A T C G N
+/// It stores `T` per dna base in an array in order: A T C G N
 /// 
 /// Note that other than the 5 bases are not supported.
 pub struct NucBaseMap<T> {
-    inner: [T; 5],
+    inner: [Option<T>; 5],
 }
 
 impl<T: Default> Default for NucBaseMap<T> {
     fn default() -> Self {
         Self {
-            inner: std::array::from_fn(|_| T::default()),
+            inner: std::array::from_fn(|_| None),
         }
     }
 }
@@ -44,35 +44,35 @@ impl<T> NucBaseMap<T> {
         Self::NUC_IDX_ARR[nuc_base as usize]
     }
 
-    /// Get reference of T of input base. None if non supported base is given.
+    /// Get reference of value of input base key. `None` if the key has no value or non supported base is given.
     pub fn get(&self, nuc_base: u8) -> Option<&T> {
         let idx = Self::get_nuc_idx(nuc_base);
 
         if idx < 5 {
-            Some(&self.inner[idx])
+            self.inner[idx].as_ref()
         } else {
             None
         }
     }
 
-    /// Get mutable reference of T of input base. None if non supported base is given.
+    /// Get mutable reference of value of input base key. `None` if the key has no value or non supported base is given.
     pub fn get_mut(&mut self, nuc_base: u8) -> Option<&mut T> {
         let idx = Self::get_nuc_idx(nuc_base);
 
         if idx < 5 {
-            Some(&mut self.inner[idx])
+            self.inner[idx].as_mut()
         } else {
             None
         }
     }
 
     /// iteration order: A T C G N
-    pub fn iter(&self) -> std::slice::Iter<'_, T> {
+    pub fn iter(&self) -> std::slice::Iter<'_, Option<T>> {
         self.inner.iter()
     }
 
     /// iteration order: A T C G N
-    pub fn iter_mut(&mut self) -> std::slice::IterMut<'_, T> {
+    pub fn iter_mut(&mut self) -> std::slice::IterMut<'_, Option<T>> {
         self.inner.iter_mut()
     }
 }
