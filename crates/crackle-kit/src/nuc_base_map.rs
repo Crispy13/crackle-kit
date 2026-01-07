@@ -2,7 +2,7 @@ use std::{borrow::Borrow, collections::HashMap};
 
 /// DNA base map.
 /// It stores `T` per dna base in an array in order: A T C G N
-/// 
+///
 /// Note that other than the 5 bases are not supported.
 pub struct NucBaseMap<T> {
     inner: [Option<T>; 5],
@@ -44,7 +44,7 @@ impl<T> NucBaseMap<T> {
         Self::NUC_IDX_ARR[nuc_base as usize]
     }
 
-    /// Get reference of value of input base key. `None` if the key has no value or non supported base is given.
+    /// Get reference of value of input base key. `None` if the key has no value or a non supported base is given.
     pub fn get(&self, nuc_base: u8) -> Option<&T> {
         let idx = Self::get_nuc_idx(nuc_base);
 
@@ -55,7 +55,21 @@ impl<T> NucBaseMap<T> {
         }
     }
 
-    /// Get mutable reference of value of input base key. `None` if the key has no value or non supported base is given.
+    /// Inserts a value computed from `f` into the option if it is [`None`],
+    /// then returns a mutable reference to the contained value.
+    /// 
+    /// [`None`] if a non supported base is given.
+    pub fn get_or_insert_with(&mut self, nuc_base: u8, f: impl FnOnce() -> T) -> Option<&mut T> {
+        let idx = Self::get_nuc_idx(nuc_base);
+
+        if idx < 5 {
+            Some(self.inner[idx].get_or_insert_with(f))
+        } else {
+            None
+        }
+    }
+
+    /// Get mutable reference of value of input base key. `None` if the key has no value or a non supported base is given.
     pub fn get_mut(&mut self, nuc_base: u8) -> Option<&mut T> {
         let idx = Self::get_nuc_idx(nuc_base);
 
@@ -76,7 +90,6 @@ impl<T> NucBaseMap<T> {
         self.inner.iter_mut()
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -194,9 +207,11 @@ mod tests {
         // Iterate and modify
         let mut sum_after_mod = 0;
         for (i, val_ref) in map.iter_mut().enumerate() {
-            if i == 0 { // This corresponds to 'A' (index 0)
+            if i == 0 {
+                // This corresponds to 'A' (index 0)
                 *val_ref += 1; // 10 -> 11
-            } else if i == 1 { // This corresponds to 'T' (index 1)
+            } else if i == 1 {
+                // This corresponds to 'T' (index 1)
                 *val_ref -= 5; // 20 -> 15
             }
             sum_after_mod += *val_ref;
@@ -210,7 +225,7 @@ mod tests {
         assert_eq!(*map.get(b'N').unwrap(), 0); // Still default
         assert_eq!(sum_after_mod, 11 + 15 + 0 + 0 + 0);
     }
-    
+
     // Dedicated test to ensure NUC_IDX_ARR and get_nuc_idx correctly handle all cases
     #[test]
     fn test_nuc_idx_arr_mapping() {
