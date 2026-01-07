@@ -1,5 +1,9 @@
 use std::borrow::Borrow;
 
+/// DNA base map.
+/// It stores dna base count in an array in order: A T C G N
+/// 
+/// Note that other than the 5 bases are not supported.
 pub struct NucBaseMap<T> {
     inner: [T; 5],
 }
@@ -40,6 +44,7 @@ impl<T> NucBaseMap<T> {
         Self::NUC_IDX_ARR[nuc_base as usize]
     }
 
+    /// Get reference of count of input base. None if non supported base is given.
     pub fn get(&self, nuc_base: u8) -> Option<&T> {
         let idx = Self::get_nuc_idx(nuc_base);
 
@@ -50,6 +55,7 @@ impl<T> NucBaseMap<T> {
         }
     }
 
+    /// Get mutable reference of count of input base. None if non supported base is given.
     pub fn get_mut(&mut self, nuc_base: u8) -> Option<&mut T> {
         let idx = Self::get_nuc_idx(nuc_base);
 
