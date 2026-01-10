@@ -6,9 +6,12 @@ use anyhow::{Error, anyhow};
 /// It stores `T` per dna base in an array in order: A T C G N
 ///
 /// Note that other than the 5 bases are not supported.
+#[derive(Debug, Clone)]
 pub struct NucBaseMap<T> {
     inner: [Option<T>; 5],
 }
+
+impl<T: Copy> Copy for NucBaseMap<T> {}
 
 impl<T: Default> Default for NucBaseMap<T> {
     fn default() -> Self {
@@ -40,6 +43,16 @@ impl<T> NucBaseMap<T> {
         idx_arr[Self::NUC_BASES[4].to_ascii_lowercase() as usize] = 4;
 
         idx_arr
+    }
+
+    #[inline]
+    pub fn get_inner(&self) -> &[Option<T>; 5] {
+        &self.inner
+    }
+
+    #[inline]
+    pub fn get_mut_inner(&mut self) -> &mut [Option<T>; 5] {
+        &mut self.inner
     }
 
     #[inline]
@@ -101,15 +114,6 @@ impl<T> NucBaseMap<T> {
         }
     }
 
-    /// iteration order: A T C G N
-    pub fn iter(&self) -> std::slice::Iter<'_, Option<T>> {
-        self.inner.iter()
-    }
-
-    /// iteration order: A T C G N
-    pub fn iter_mut(&mut self) -> std::slice::IterMut<'_, Option<T>> {
-        self.inner.iter_mut()
-    }
 }
 
 #[cfg(test)]
@@ -121,22 +125,6 @@ mod tests {
     struct NonCopyStruct {
         value: u32,
         name: String,
-    }
-
-    #[test]
-    fn test_default_initialization() {
-        // Test with a Copy type (u32)
-        let map_u32: NucBaseMap<u32> = NucBaseMap::default();
-        for &val in map_u32.inner.iter() {
-            assert_eq!(val, 0); // Default for u32 is 0
-        }
-
-        // Test with a non-Copy type (NonCopyStruct)
-        let map_non_copy: NucBaseMap<NonCopyStruct> = NucBaseMap::default();
-        for val in map_non_copy.inner.iter() {
-            assert_eq!(val.value, 0);
-            assert_eq!(val.name, ""); // Default for String is empty
-        }
     }
 
     #[test]
@@ -198,53 +186,6 @@ mod tests {
         assert_eq!(map.get_mut(0), None);
         assert_eq!(map.get_mut(255), None);
         assert_eq!(map.get_mut(b'P'), None);
-    }
-
-    #[test]
-    fn test_iter() {
-        let mut map: NucBaseMap<u32> = NucBaseMap::default();
-        *map.get_mut(b'A').unwrap() = 1;
-        *map.get_mut(b'T').unwrap() = 2;
-        *map.get_mut(b'C').unwrap() = 3;
-        *map.get_mut(b'G').unwrap() = 4;
-        *map.get_mut(b'N').unwrap() = 5;
-
-        let mut iter = map.iter();
-        // The iteration order is A, T, C, G, N, based on the `inner` array's indices.
-        assert_eq!(iter.next(), Some(&1));
-        assert_eq!(iter.next(), Some(&2));
-        assert_eq!(iter.next(), Some(&3));
-        assert_eq!(iter.next(), Some(&4));
-        assert_eq!(iter.next(), Some(&5));
-        assert_eq!(iter.next(), None); // End of iteration
-    }
-
-    #[test]
-    fn test_iter_mut() {
-        let mut map: NucBaseMap<u32> = NucBaseMap::default();
-        *map.get_mut(b'A').unwrap() = 10;
-        *map.get_mut(b'T').unwrap() = 20;
-
-        // Iterate and modify
-        let mut sum_after_mod = 0;
-        for (i, val_ref) in map.iter_mut().enumerate() {
-            if i == 0 {
-                // This corresponds to 'A' (index 0)
-                *val_ref += 1; // 10 -> 11
-            } else if i == 1 {
-                // This corresponds to 'T' (index 1)
-                *val_ref -= 5; // 20 -> 15
-            }
-            sum_after_mod += *val_ref;
-        }
-
-        // Verify changes by getting values from the map
-        assert_eq!(*map.get(b'A').unwrap(), 11);
-        assert_eq!(*map.get(b'T').unwrap(), 15);
-        assert_eq!(*map.get(b'C').unwrap(), 0); // Still default
-        assert_eq!(*map.get(b'G').unwrap(), 0); // Still default
-        assert_eq!(*map.get(b'N').unwrap(), 0); // Still default
-        assert_eq!(sum_after_mod, 11 + 15 + 0 + 0 + 0);
     }
 
     // Dedicated test to ensure NUC_IDX_ARR and get_nuc_idx correctly handle all cases

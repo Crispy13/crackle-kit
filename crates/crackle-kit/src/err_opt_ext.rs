@@ -40,9 +40,9 @@ macro_rules! impl_option_handle_trait {
     };
 }
 
-use std::{borrow::Borrow, collections::HashMap, hash::Hash, slice::SliceIndex};
+use std::{borrow::Borrow, collections::HashMap, hash::Hash, ops::{Range, RangeFrom}, slice::SliceIndex, str::Utf8Error};
 
-use anyhow::Error;
+use anyhow::{Error, anyhow};
 pub(crate) use impl_option_handle_trait;
 
 pub(crate) trait HashMapExt<K, V> {
@@ -116,3 +116,4 @@ impl<T> SliceIndexExt for [T] {
         }
     }
 }
+
