@@ -1,3 +1,8 @@
+use anyhow::{Error, anyhow};
+use std::ops::{Range, RangeFrom};
+use std::slice::SliceIndex;
+use std::str::Utf8Error;
+
 // Define the trait
 pub trait SliceExt<I: SliceIndex<Self> + Clone> {
     fn get_or_err(&self, index: I) -> Result<&I::Output, Error>;
@@ -21,7 +26,7 @@ pub trait SliceExt<I: SliceIndex<Self> + Clone> {
 //     }
 // }
 
-impl<T, I: SliceIndex<Self> + Clone + Debug> SliceExt<I> for [T] {
+impl<T, I: SliceIndex<Self> + Clone + std::fmt::Debug> SliceExt<I> for [T] {
     fn get_or_err(&self, index: I) -> Result<&<I as SliceIndex<[T]>>::Output, Error> {
         match self.get(index.clone()) {
             Some(v) => Ok(v),
@@ -32,14 +37,15 @@ impl<T, I: SliceIndex<Self> + Clone + Debug> SliceExt<I> for [T] {
             )),
         }
     }
-    
+
     fn get_mut_or_err(&mut self, index: I) -> Result<&mut <I as SliceIndex<[T]>>::Output, Error> {
+        let len = self.len();
         match self.get_mut(index.clone()) {
             Some(v) => Ok(v),
             None => Err(anyhow!(
                 "Indexing failed: idx:{:?} target_len:{}",
                 index,
-                self.len()
+                len
             )),
         }
     }

@@ -6,3 +6,4 @@ pub mod batch_region;
 pub mod batched_channel;
 #[cfg(feature = "batch-work")]
 pub mod batched_data;
+pub mod traits;

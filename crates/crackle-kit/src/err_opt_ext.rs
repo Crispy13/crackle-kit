@@ -39,11 +39,10 @@ macro_rules! impl_option_handle_trait {
         }
     };
 }
-
-use std::{borrow::Borrow, collections::HashMap, hash::Hash, ops::{Range, RangeFrom}, slice::SliceIndex, str::Utf8Error};
-
-use anyhow::{Error, anyhow};
 pub(crate) use impl_option_handle_trait;
+
+use std::slice::SliceIndex;
+
 
 pub(crate) trait HashMapExt<K, V> {
     fn get_or_keyerr<Q>(&self, k: &Q) -> Result<&V, anyhow::Error>
