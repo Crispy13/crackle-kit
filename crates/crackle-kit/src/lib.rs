@@ -5,6 +5,7 @@ mod err_opt_ext;
 
 pub mod nuc_base_map;
 mod utils;
+pub mod errors;
 
 pub mod data;
 pub mod zerocopy;
