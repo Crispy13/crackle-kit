@@ -1,4 +1,5 @@
 pub mod binning;
+pub mod rounding;
 
 #[cfg(feature = "batch-work")]
 pub mod batch_region;
